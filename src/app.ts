@@ -3,7 +3,9 @@ import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
 import path from "path";
+import swaggerUi from "swagger-ui-express";
 import { ZodError } from "zod";
+import { openApiDocument } from "./docs/openapi";
 import { getUploadRoot } from "./lib/file-storage";
 import { authRouter } from "./modules/auth/auth.routes";
 import { classesRouter } from "./modules/classes/classes.routes";
@@ -20,9 +22,18 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(morgan("dev"));
 app.use("/uploads", express.static(path.resolve(getUploadRoot())));
+app.use("/docs", (_req, res, next) => {
+  res.removeHeader("Content-Security-Policy");
+  next();
+});
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
+});
+
+app.get("/openapi.json", (_req, res) => {
+  res.json(openApiDocument);
 });
 
 app.use("/api/auth", authRouter);

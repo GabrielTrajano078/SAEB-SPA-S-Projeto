@@ -1,0 +1,815 @@
+const objectId = {
+  type: "string",
+  pattern: "^[a-f\\d]{24}$",
+  example: "69c6f8703a3ba38a6a0cfe7c",
+};
+
+const errorResponse = {
+  description: "Erro da API",
+  content: {
+    "application/json": {
+      schema: {
+        type: "object",
+        properties: {
+          message: { type: "string", example: "Erro interno do servidor." },
+        },
+      },
+    },
+  },
+};
+
+export const openApiDocument = {
+  openapi: "3.0.3",
+  info: {
+    title: "SAEB SPAS Diagnostico API",
+    version: "1.0.0",
+    description:
+      "API para autenticacao, cadastro escolar, montagem de provas, geracao de cartoes-resposta e diagnosticos pedagógicos.",
+  },
+  servers: [
+    {
+      url: "http://localhost:3001",
+      description: "Ambiente local",
+    },
+  ],
+  tags: [
+    { name: "Health" },
+    { name: "Auth" },
+    { name: "Schools" },
+    { name: "Classes" },
+    { name: "Students" },
+    { name: "Questions" },
+    { name: "Exams" },
+    { name: "Results" },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+      },
+    },
+    schemas: {
+      IdResponse: {
+        type: "object",
+        properties: {
+          id: objectId,
+        },
+      },
+      LoginRequest: {
+        type: "object",
+        required: ["email", "password"],
+        properties: {
+          email: { type: "string", format: "email", example: "admin@saeb.local" },
+          password: { type: "string", example: "Admin123" },
+        },
+      },
+      BootstrapAdminRequest: {
+        type: "object",
+        required: ["fullName", "email", "password"],
+        properties: {
+          fullName: { type: "string", example: "Administrador Local" },
+          email: { type: "string", format: "email", example: "admin@saeb.local" },
+          password: { type: "string", example: "Admin123" },
+        },
+      },
+      AuthResponse: {
+        type: "object",
+        properties: {
+          token: { type: "string", example: "eyJhbGciOi..." },
+          user: {
+            type: "object",
+            properties: {
+              id: objectId,
+              fullName: { type: "string", example: "Administrador Local" },
+              email: { type: "string", format: "email", example: "admin@saeb.local" },
+              role: { type: "string", enum: ["admin", "professor", "coordenador", "gestor"] },
+              schoolId: { anyOf: [objectId, { type: "null" }] },
+              municipalityCode: { anyOf: [{ type: "string", example: "2304400" }, { type: "null" }] },
+            },
+          },
+        },
+      },
+      SchoolRequest: {
+        type: "object",
+        required: ["name"],
+        properties: {
+          name: { type: "string", example: "EMEF Jose de Alencar" },
+          city: { type: "string", example: "Fortaleza" },
+          municipalityCode: { type: "string", example: "2304400" },
+        },
+      },
+      ClassroomRequest: {
+        type: "object",
+        required: ["schoolId", "name", "grade"],
+        properties: {
+          schoolId: objectId,
+          name: { type: "string", example: "5A Manha" },
+          grade: { type: "string", enum: ["5", "9"], example: "5" },
+        },
+      },
+      StudentRequest: {
+        type: "object",
+        required: ["schoolId", "classroomId", "fullName", "registrationCode"],
+        properties: {
+          schoolId: objectId,
+          classroomId: objectId,
+          fullName: { type: "string", example: "Ana Clara Sousa" },
+          registrationCode: { type: "string", example: "ALU-0001" },
+        },
+      },
+      QuestionRequest: {
+        type: "object",
+        required: [
+          "discipline",
+          "grade",
+          "framework",
+          "descriptor",
+          "difficulty",
+          "prompt",
+          "optionA",
+          "optionB",
+          "optionC",
+          "optionD",
+          "answer",
+        ],
+        properties: {
+          discipline: { type: "string", enum: ["LP", "MAT"], example: "LP" },
+          grade: { type: "string", enum: ["5", "9"], example: "5" },
+          framework: { type: "string", enum: ["SAEB", "SPAS"], example: "SAEB" },
+          descriptor: { type: "string", example: "D1" },
+          axis: {
+            type: "string",
+            enum: [
+              "LEITURA",
+              "INTERPRETACAO",
+              "GENEROS_TEXTUAIS",
+              "LINGUA_ESTUDO",
+              "NUMEROS",
+              "ALGEBRA",
+              "GEOMETRIA",
+              "ESTATISTICA",
+              "GRANDEZAS_MEDIDAS",
+            ],
+            example: "LEITURA",
+          },
+          difficulty: { type: "string", enum: ["FACIL", "MEDIO", "DIFICIL"], example: "FACIL" },
+          prompt: { type: "string", example: "Qual e a finalidade principal do texto apresentado?" },
+          optionA: { type: "string", example: "Contar uma historia." },
+          optionB: { type: "string", example: "Dar uma instrucao." },
+          optionC: { type: "string", example: "Fazer um convite." },
+          optionD: { type: "string", example: "Expressar uma opiniao." },
+          answer: { type: "string", enum: ["A", "B", "C", "D"], example: "B" },
+        },
+      },
+      ExamRequest: {
+        type: "object",
+        required: ["schoolId", "classroomId", "title", "discipline", "grade", "framework"],
+        properties: {
+          schoolId: objectId,
+          classroomId: objectId,
+          title: { type: "string", example: "Simulado Diagnostico LP 5o Ano" },
+          discipline: { type: "string", enum: ["LP", "MAT"], example: "LP" },
+          grade: { type: "string", enum: ["5", "9"], example: "5" },
+          framework: { type: "string", enum: ["SAEB", "SPAS"], example: "SAEB" },
+          examType: {
+            type: "string",
+            enum: ["PERSONALIZADA", "RECUPERACAO", "SIMULADO"],
+            example: "SIMULADO",
+          },
+          sourceType: {
+            type: "string",
+            enum: ["QUESTION_BANK", "PDF_IMPORT"],
+            example: "QUESTION_BANK",
+          },
+          status: {
+            type: "string",
+            enum: ["DRAFT", "READY", "APPLIED", "CLOSED"],
+            example: "DRAFT",
+          },
+          questionIds: {
+            type: "array",
+            items: objectId,
+          },
+          blueprintByAxis: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["axis", "count"],
+              properties: {
+                axis: { type: "string", example: "LEITURA" },
+                count: { type: "integer", example: 3 },
+              },
+            },
+          },
+        },
+      },
+      AnswerKeyRequest: {
+        type: "object",
+        properties: {
+          notes: { type: "string", example: "Gabarito oficial da aplicacao demo." },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["order", "correctAnswer"],
+              properties: {
+                order: { type: "integer", example: 1 },
+                questionId: objectId,
+                correctAnswer: { type: "string", enum: ["A", "B", "C", "D", "N/A"], example: "B" },
+                isVoided: { type: "boolean", example: false },
+              },
+            },
+          },
+        },
+      },
+      GenerateSheetsRequest: {
+        type: "object",
+        properties: {
+          studentIds: {
+            type: "array",
+            items: objectId,
+          },
+          questionsPerPage: { type: "integer", example: 20 },
+        },
+      },
+      RegisterAnswerSheetRequest: {
+        type: "object",
+        required: ["examId", "studentId"],
+        properties: {
+          examId: objectId,
+          studentId: objectId,
+          uploadUrl: { type: "string", format: "uri", example: "http://localhost:3001/uploads/demo.png" },
+        },
+      },
+      CorrectionByOrderRequest: {
+        type: "object",
+        required: ["answerSheetId", "marks"],
+        properties: {
+          answerSheetId: objectId,
+          marks: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["order", "markedAnswer"],
+              properties: {
+                order: { type: "integer", example: 1 },
+                markedAnswer: { type: "string", enum: ["A", "B", "C", "D"], example: "B" },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  paths: {
+    "/health": {
+      get: {
+        tags: ["Health"],
+        summary: "Verifica se a API esta ativa",
+        responses: {
+          200: {
+            description: "API ativa",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: { type: "string", example: "ok" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/auth/bootstrap-admin": {
+      post: {
+        tags: ["Auth"],
+        summary: "Cria o primeiro admin da base",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/BootstrapAdminRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Admin criado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/IdResponse" },
+              },
+            },
+          },
+          409: errorResponse,
+        },
+      },
+    },
+    "/api/auth/login": {
+      post: {
+        tags: ["Auth"],
+        summary: "Autentica e devolve JWT",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/LoginRequest" },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Login realizado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AuthResponse" },
+              },
+            },
+          },
+          401: errorResponse,
+        },
+      },
+    },
+    "/api/auth/me": {
+      get: {
+        tags: ["Auth"],
+        summary: "Retorna o usuario autenticado",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Perfil autenticado",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: objectId,
+                    fullName: { type: "string" },
+                    email: { type: "string", format: "email" },
+                    role: { type: "string" },
+                    schoolId: { anyOf: [objectId, { type: "null" }] },
+                    municipalityCode: { anyOf: [{ type: "string" }, { type: "null" }] },
+                  },
+                },
+              },
+            },
+          },
+          401: errorResponse,
+        },
+      },
+    },
+    "/api/schools": {
+      get: {
+        tags: ["Schools"],
+        summary: "Lista escolas",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: "Lista de escolas",
+          },
+          403: errorResponse,
+        },
+      },
+      post: {
+        tags: ["Schools"],
+        summary: "Cria escola",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SchoolRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Escola criada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/IdResponse" },
+              },
+            },
+          },
+          403: errorResponse,
+        },
+      },
+    },
+    "/api/classes": {
+      get: {
+        tags: ["Classes"],
+        summary: "Lista turmas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "schoolId", in: "query", schema: objectId },
+          { name: "grade", in: "query", schema: { type: "string", enum: ["5", "9"] } },
+        ],
+        responses: {
+          200: { description: "Lista de turmas" },
+        },
+      },
+      post: {
+        tags: ["Classes"],
+        summary: "Cria turma",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ClassroomRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Turma criada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/IdResponse" },
+              },
+            },
+          },
+          403: errorResponse,
+        },
+      },
+    },
+    "/api/students": {
+      get: {
+        tags: ["Students"],
+        summary: "Lista alunos",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "schoolId", in: "query", schema: objectId },
+          { name: "classroomId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Lista de alunos" },
+        },
+      },
+      post: {
+        tags: ["Students"],
+        summary: "Cria aluno",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/StudentRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Aluno criado",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/IdResponse" },
+              },
+            },
+          },
+          400: errorResponse,
+        },
+      },
+    },
+    "/api/questions": {
+      get: {
+        tags: ["Questions"],
+        summary: "Lista questoes do banco",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "discipline", in: "query", schema: { type: "string", enum: ["LP", "MAT"] } },
+          { name: "grade", in: "query", schema: { type: "string", enum: ["5", "9"] } },
+          { name: "framework", in: "query", schema: { type: "string", enum: ["SAEB", "SPAS"] } },
+          { name: "descriptor", in: "query", schema: { type: "string" } },
+          { name: "axis", in: "query", schema: { type: "string" } },
+          { name: "difficulty", in: "query", schema: { type: "string", enum: ["FACIL", "MEDIO", "DIFICIL"] } },
+        ],
+        responses: {
+          200: { description: "Lista de questoes" },
+        },
+      },
+      post: {
+        tags: ["Questions"],
+        summary: "Cria questao",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/QuestionRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Questao criada",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/IdResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/questions/suggestions": {
+      get: {
+        tags: ["Questions"],
+        summary: "Sugere descritores fracos da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "query", required: true, schema: objectId },
+          { name: "discipline", in: "query", required: true, schema: { type: "string", enum: ["LP", "MAT"] } },
+          { name: "grade", in: "query", required: true, schema: { type: "string", enum: ["5", "9"] } },
+          { name: "framework", in: "query", required: true, schema: { type: "string", enum: ["SAEB", "SPAS"] } },
+          { name: "weakThreshold", in: "query", schema: { type: "number", example: 60 } },
+          { name: "limit", in: "query", schema: { type: "integer", example: 10 } },
+        ],
+        responses: {
+          200: { description: "Sugestoes de descritores" },
+        },
+      },
+    },
+    "/api/exams": {
+      get: {
+        tags: ["Exams"],
+        summary: "Lista provas",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "schoolId", in: "query", schema: objectId },
+          { name: "classroomId", in: "query", schema: objectId },
+          { name: "discipline", in: "query", schema: { type: "string", enum: ["LP", "MAT"] } },
+          { name: "grade", in: "query", schema: { type: "string", enum: ["5", "9"] } },
+        ],
+        responses: {
+          200: { description: "Lista de provas" },
+        },
+      },
+      post: {
+        tags: ["Exams"],
+        summary: "Cria prova",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ExamRequest" },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Prova criada",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    id: objectId,
+                    examCode: { type: "string", example: "A7B9K2Q4" },
+                    totalQuestions: { type: "integer", example: 6 },
+                  },
+                },
+              },
+            },
+          },
+          400: errorResponse,
+        },
+      },
+    },
+    "/api/exams/blueprint/simulado": {
+      get: {
+        tags: ["Exams"],
+        summary: "Consulta blueprint padrao de simulado",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "framework", in: "query", required: true, schema: { type: "string", enum: ["SAEB", "SPAS"] } },
+          { name: "discipline", in: "query", required: true, schema: { type: "string", enum: ["LP", "MAT"] } },
+          { name: "grade", in: "query", required: true, schema: { type: "string", enum: ["5", "9"] } },
+        ],
+        responses: {
+          200: { description: "Blueprint retornado" },
+        },
+      },
+    },
+    "/api/exams/{id}": {
+      get: {
+        tags: ["Exams"],
+        summary: "Detalha prova",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: objectId }],
+        responses: {
+          200: { description: "Detalhe da prova" },
+          404: errorResponse,
+        },
+      },
+    },
+    "/api/exams/{id}/answer-key": {
+      get: {
+        tags: ["Exams"],
+        summary: "Busca gabarito oficial ativo",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: objectId }],
+        responses: {
+          200: { description: "Gabarito encontrado" },
+          404: errorResponse,
+        },
+      },
+      post: {
+        tags: ["Exams"],
+        summary: "Publica gabarito oficial",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: objectId }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AnswerKeyRequest" },
+            },
+          },
+        },
+        responses: {
+          201: { description: "Gabarito publicado" },
+          400: errorResponse,
+        },
+      },
+    },
+    "/api/exams/{id}/answer-sheets/generate": {
+      post: {
+        tags: ["Exams"],
+        summary: "Gera PDF de cartoes-resposta",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: objectId }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/GenerateSheetsRequest" },
+            },
+          },
+        },
+        responses: {
+          201: { description: "Cartoes gerados" },
+          400: errorResponse,
+        },
+      },
+    },
+    "/api/results/answer-sheets": {
+      post: {
+        tags: ["Results"],
+        summary: "Registra cartao-resposta de um aluno",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RegisterAnswerSheetRequest" },
+            },
+          },
+        },
+        responses: {
+          201: { description: "Cartao registrado" },
+          200: { description: "Cartao ja existente" },
+        },
+      },
+    },
+    "/api/results/corrections/by-order": {
+      post: {
+        tags: ["Results"],
+        summary: "Corrige prova manualmente pela ordem das questoes",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CorrectionByOrderRequest" },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Correcao persistida" },
+          400: errorResponse,
+        },
+      },
+    },
+    "/api/results/diagnosis/classroom": {
+      get: {
+        tags: ["Results"],
+        summary: "Diagnostico por descritor da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "query", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Diagnostico retornado" },
+        },
+      },
+    },
+    "/api/results/diagnosis/classroom/by-axis": {
+      get: {
+        tags: ["Results"],
+        summary: "Diagnostico por eixo da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "query", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Diagnostico por eixo retornado" },
+        },
+      },
+    },
+    "/api/results/student/{studentId}/summary": {
+      get: {
+        tags: ["Results"],
+        summary: "Resumo de desempenho do aluno",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "studentId", in: "path", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Resumo do aluno" },
+        },
+      },
+    },
+    "/api/results/classroom/{classroomId}/ranking": {
+      get: {
+        tags: ["Results"],
+        summary: "Ranking da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "path", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Ranking retornado" },
+        },
+      },
+    },
+    "/api/results/classroom/{classroomId}/heatmap": {
+      get: {
+        tags: ["Results"],
+        summary: "Heatmap pedagogico da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "path", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+          { name: "masteryThreshold", in: "query", schema: { type: "number", example: 70 } },
+          { name: "weakThreshold", in: "query", schema: { type: "number", example: 50 } },
+        ],
+        responses: {
+          200: { description: "Heatmap retornado" },
+        },
+      },
+    },
+    "/api/results/school/{schoolId}/summary": {
+      get: {
+        tags: ["Results"],
+        summary: "Resumo pedagogico da escola",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "schoolId", in: "path", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Resumo da escola" },
+        },
+      },
+    },
+    "/api/results/municipality/summary": {
+      get: {
+        tags: ["Results"],
+        summary: "Resumo pedagogico do municipio",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "municipalityCode", in: "query", required: true, schema: { type: "string", example: "2304400" } },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Resumo do municipio" },
+        },
+      },
+    },
+    "/api/results/reports/classroom/{classroomId}": {
+      get: {
+        tags: ["Results"],
+        summary: "Relatorio pedagogico consolidado da turma",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "classroomId", in: "path", required: true, schema: objectId },
+          { name: "examId", in: "query", schema: objectId },
+        ],
+        responses: {
+          200: { description: "Relatorio da turma" },
+        },
+      },
+    },
+  },
+} as const;
