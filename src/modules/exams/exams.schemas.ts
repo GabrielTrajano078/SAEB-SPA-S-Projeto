@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   curriculumAxisSchema,
   disciplineSchema,
+  examSourceTypeSchema,
+  examStatusSchema,
   examTypeSchema,
   frameworkSchema,
   gradeSchema,
@@ -17,6 +19,9 @@ export const createExamSchema = z
     grade: gradeSchema,
     framework: frameworkSchema,
     examType: examTypeSchema.optional(),
+    sourceType: examSourceTypeSchema.optional(),
+    status: examStatusSchema.optional(),
+    questionCount: z.coerce.number().int().min(1).max(40).optional(),
     voidedQuestionIds: z.array(objectIdSchema).optional(),
     questionIds: z.array(objectIdSchema).min(1).optional(),
     blueprint: z
@@ -38,6 +43,9 @@ export const createExamSchema = z
   })
   .refine(
     (v) => {
+      if (v.sourceType === "PDF_IMPORT") {
+        return Boolean(v.questionCount);
+      }
       const flags = [
         Boolean(v.questionIds?.length),
         Boolean(v.blueprint?.length),
@@ -45,7 +53,7 @@ export const createExamSchema = z
       ].filter(Boolean).length;
       return flags === 1;
     },
-    { message: "Informe exatamente um de: questionIds, blueprint ou blueprintByAxis." },
+    { message: "Informe questionCount para PDF importado ou exatamente um de: questionIds, blueprint ou blueprintByAxis." },
   );
 
 export const listExamsSchema = z.object({
@@ -63,4 +71,23 @@ export const simulatedBlueprintQuerySchema = z.object({
 
 export const examIdParamSchema = z.object({
   id: objectIdSchema,
+});
+
+export const createOfficialAnswerKeySchema = z.object({
+  notes: z.string().max(1000).optional(),
+  items: z
+    .array(
+      z.object({
+        order: z.number().int().min(1),
+        questionId: objectIdSchema.optional(),
+        correctAnswer: z.enum(["A", "B", "C", "D", "N/A"]),
+        isVoided: z.boolean().optional(),
+      }),
+    )
+    .optional(),
+});
+
+export const generateAnswerSheetsSchema = z.object({
+  studentIds: z.array(objectIdSchema).optional(),
+  questionsPerPage: z.coerce.number().int().min(1).max(40).optional(),
 });

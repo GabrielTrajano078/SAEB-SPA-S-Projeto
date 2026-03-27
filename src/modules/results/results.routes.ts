@@ -1,24 +1,34 @@
+import path from "path";
 import { Router } from "express";
 import { Types } from "mongoose";
+import { buildPublicFileUrl, getUploadRoot, saveBufferToStorage } from "../../lib/file-storage";
 import { canAccessClassroom, canAccessSchool, canAccessStudent } from "../../lib/access";
 import { suggestIntervention } from "../../lib/pedagogy";
+import { upload } from "../../lib/upload";
 import { requireAuth, requireRole } from "../../middlewares/auth";
 import { ClassroomModel } from "../classes/classroom.model";
 import { ExamModel } from "../exams/exam.model";
+import { OfficialAnswerKeyModel } from "../exams/official-answer-key.model";
 import { QuestionModel } from "../questions/question.model";
 import { SchoolModel } from "../schools/school.model";
 import { StudentModel } from "../students/student.model";
+import { generateUniqueSheetCode } from "./answer-sheet-code";
 import { AnswerSheetModel } from "./answer-sheet.model";
+import { AnswerSheetScanModel } from "./answer-sheet-scan.model";
+import { runOmrOnImage } from "./omr.service";
 import { aggregateAxisStats, aggregateDescriptorStats } from "./results.aggregate";
 import { ResultModel } from "./result.model";
 import {
   answerSheetIdParamSchema,
+  answerSheetScanParamsSchema,
   classroomHeatmapSchema,
   classroomRankingSchema,
   classroomReportSchema,
+  createAnswerSheetScanSchema,
   diagnosisByClassroomSchema,
   municipalitySummarySchema,
   patchAnswerSheetSchema,
+  processAnswerSheetScanSchema,
   registerAnswerSheetSchema,
   schoolSummarySchema,
   studentSummarySchema,
@@ -27,6 +37,81 @@ import {
 } from "./results.schemas";
 
 export const resultsRouter = Router();
+
+function getBaseUrl(req: any): string {
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+async function getActiveAnswerKeyOrThrow(examId: Types.ObjectId) {
+  const key = await OfficialAnswerKeyModel.findOne({ examId, isActive: true }).lean();
+  if (!key) {
+    throw Object.assign(new Error("Gabarito oficial nao publicado para esta prova."), { statusCode: 400 });
+  }
+  return key;
+}
+
+async function buildAnswerSheetPayload(examId: string, studentId: string) {
+  const [exam, student] = await Promise.all([
+    ExamModel.findById(examId).lean(),
+    StudentModel.findById(studentId).lean(),
+  ]);
+
+  if (!exam) {
+    throw Object.assign(new Error("Prova nao encontrada."), { statusCode: 404 });
+  }
+  if (!student) {
+    throw Object.assign(new Error("Aluno nao encontrado."), { statusCode: 404 });
+  }
+  if (String(student.classroomId) !== String(exam.classroomId)) {
+    throw Object.assign(new Error("O aluno nao pertence a turma vinculada a esta prova."), { statusCode: 400 });
+  }
+
+  const [school, classroom] = await Promise.all([
+    SchoolModel.findById(exam.schoolId).lean(),
+    ClassroomModel.findById(exam.classroomId).lean(),
+  ]);
+
+  if (!school || !classroom) {
+    throw Object.assign(new Error("Escola ou turma vinculada nao encontrada."), { statusCode: 404 });
+  }
+
+  const sheetCode = await generateUniqueSheetCode();
+  const qrPayload = JSON.stringify({
+    sheetCode,
+    examId: String(exam._id),
+    studentId: String(student._id),
+    examCode: exam.examCode,
+    omrTemplateVersion: exam.omrTemplateVersion,
+  });
+
+  return {
+    examId: exam._id,
+    studentId: student._id,
+    sheetCode,
+    qrPayload,
+    studentSnapshot: {
+      fullName: student.fullName,
+      registrationCode: student.registrationCode,
+    },
+    classroomSnapshot: {
+      name: classroom.name,
+      grade: classroom.grade,
+    },
+    schoolSnapshot: {
+      name: school.name,
+      city: school.city,
+    },
+    layout: {
+      questionsPerPage: exam.questionCount,
+      totalQuestions: exam.questionCount,
+      optionsPerQuestion: 4 as const,
+      anchorSetVersion: exam.omrTemplateVersion,
+    },
+    generatedAt: new Date(),
+    status: "GENERATED" as const,
+    processingStatus: "PENDING" as const,
+  };
+}
 
 async function answerSheetIdsForClassroom(
   classroomId: string,
@@ -45,7 +130,9 @@ async function answerSheetIdsForClassroom(
 
 async function persistExamCorrection(
   answerSheetId: string,
-  answers: { questionId: string; markedAnswer: string }[],
+  answers: { order?: number; questionId?: string | null; markedAnswer: string; confidence?: number | null }[],
+  correctionSource: "MANUAL" | "OMR" = "MANUAL",
+  answerSheetScanId?: string,
 ): Promise<{ totalEffective: number; correct: number; percentage: number }> {
   const sheet = await AnswerSheetModel.findById(answerSheetId).lean();
   if (!sheet) {
@@ -57,59 +144,87 @@ async function persistExamCorrection(
     throw Object.assign(new Error("Prova nao encontrada."), { statusCode: 404 });
   }
 
-  const examQuestionIds = new Set(exam.questions.map((q) => String(q.questionId)));
-  const voided = new Set((exam.voidedQuestionIds ?? []).map((id) => String(id)));
+  const answerKey = await getActiveAnswerKeyOrThrow(exam._id);
+  const officialByOrder = new Map(answerKey.items.map((item) => [item.order, item]));
+  const questionIdByOrder = new Map(
+    exam.questions
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((item) => [item.order, String(item.questionId)]),
+  );
+  const orderByQuestionId = new Map(
+    exam.questions
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((item) => [String(item.questionId), item.order]),
+  );
 
-  if (answers.length !== exam.questions.length) {
+  if (answers.length !== exam.questionCount) {
     throw Object.assign(
-      new Error(`Envie exatamente ${exam.questions.length} resposta(s), uma por questao da prova.`),
+      new Error(`Envie exatamente ${exam.questionCount} resposta(s), uma por questao da prova.`),
       { statusCode: 400 },
     );
   }
 
-  const submittedIds = answers.map((a) => a.questionId);
-  if (new Set(submittedIds).size !== submittedIds.length) {
-    throw Object.assign(new Error("questionId duplicado na correcao."), { statusCode: 400 });
+  const resolvedAnswers = answers.map((answer) => ({
+    ...answer,
+    order: answer.order ?? (answer.questionId ? orderByQuestionId.get(answer.questionId) : undefined),
+  }));
+
+  const submittedOrders = resolvedAnswers.map((a) => a.order);
+  if (submittedOrders.some((order) => order === undefined)) {
+    throw Object.assign(new Error("Nao foi possivel identificar a ordem de todas as questoes."), {
+      statusCode: 400,
+    });
+  }
+  if (new Set(submittedOrders).size !== submittedOrders.length) {
+    throw Object.assign(new Error("Ordem duplicada na correcao."), { statusCode: 400 });
   }
 
-  for (const answer of answers) {
-    if (!examQuestionIds.has(answer.questionId)) {
-      throw Object.assign(new Error("Questao nao pertence a esta prova."), { statusCode: 400 });
+  for (const answer of resolvedAnswers) {
+    if (!answer.order || !officialByOrder.has(answer.order)) {
+      throw Object.assign(new Error("Questao fora da ordem esperada para esta prova."), { statusCode: 400 });
     }
   }
 
-  const questionIds = answers.map((a) => new Types.ObjectId(a.questionId));
-  const questions = await QuestionModel.find({ _id: { $in: questionIds } })
-    .select("_id answer")
-    .lean();
-  const answerKey = new Map(questions.map((q) => [String(q._id), q.answer]));
-
-  const docs = answers.map((answer) => {
-    const correctAnswer = answerKey.get(answer.questionId);
-    if (correctAnswer === undefined) {
-      throw Object.assign(new Error("Questao referenciada nao existe mais no banco."), { statusCode: 400 });
+  const docs = resolvedAnswers.map((answer) => {
+    const official = officialByOrder.get(answer.order!);
+    if (!official) {
+      throw Object.assign(new Error("Item do gabarito nao encontrado."), { statusCode: 400 });
     }
-    const isVoided = voided.has(answer.questionId);
+    const resolvedQuestionId = answer.questionId ?? questionIdByOrder.get(answer.order!) ?? null;
+    const isVoided = official.isVoided || official.correctAnswer === "N/A";
     const marked = isVoided ? "N/A" : answer.markedAnswer;
     const isCorrect =
       !isVoided &&
       marked !== "X" &&
       marked !== "N/A" &&
-      marked === correctAnswer;
+      marked === official.correctAnswer;
 
     return {
       answerSheetId: new Types.ObjectId(answerSheetId),
-      questionId: new Types.ObjectId(answer.questionId),
+      examId: exam._id,
+      studentId: sheet.studentId,
+      questionId: resolvedQuestionId ? new Types.ObjectId(resolvedQuestionId) : null,
+      order: answer.order!,
+      officialAnswer: official.correctAnswer,
       markedAnswer: marked as "A" | "B" | "C" | "D" | "X" | "N/A",
       isCorrect,
+      score: isCorrect ? 1 : 0,
+      correctionSource,
+      answerSheetScanId: answerSheetScanId ? new Types.ObjectId(answerSheetScanId) : null,
+      confidence: answer.confidence ?? null,
     };
   });
 
   await ResultModel.deleteMany({ answerSheetId: new Types.ObjectId(answerSheetId) });
   await ResultModel.insertMany(docs);
-  await AnswerSheetModel.updateOne({ _id: answerSheetId }, { $set: { processingStatus: "DONE" } });
+  await AnswerSheetModel.updateOne(
+    { _id: answerSheetId },
+    { $set: { processingStatus: "DONE", status: "PROCESSED", processedAt: new Date() } },
+  );
 
-  const effective = docs.filter((d) => !voided.has(String(d.questionId)));
+  const effective = docs.filter((d) => d.officialAnswer !== "N/A");
   const correct = effective.filter((d) => d.isCorrect).length;
   const totalEffective = effective.length;
   const percentage = totalEffective ? (correct / totalEffective) * 100 : 0;
@@ -135,7 +250,7 @@ resultsRouter.post(
         return;
       }
 
-      const exam = await ExamModel.findById(data.examId).select("schoolId").lean();
+      const exam = await ExamModel.findById(data.examId).select("schoolId classroomId").lean();
       if (!exam) {
         res.status(404).json({ message: "Prova nao encontrada." });
         return;
@@ -146,12 +261,35 @@ resultsRouter.post(
         return;
       }
 
-      const answerSheet = await AnswerSheetModel.create({
+      const existing = await AnswerSheetModel.findOne({
         examId: new Types.ObjectId(data.examId),
         studentId: new Types.ObjectId(data.studentId),
-        uploadUrl: data.uploadUrl,
       });
-      res.status(201).json({ id: String(answerSheet._id) });
+
+      if (existing) {
+        res.json({ id: String(existing._id), alreadyExists: true });
+        return;
+      }
+
+      try {
+        const payload = await buildAnswerSheetPayload(data.examId, data.studentId);
+        const answerSheet = await AnswerSheetModel.create({
+          ...payload,
+          uploadUrl: data.uploadUrl,
+        });
+        res.status(201).json({ id: String(answerSheet._id), sheetCode: answerSheet.sheetCode });
+      } catch (e) {
+        const err = e as { statusCode?: number; message?: string };
+        if (err.statusCode === 404) {
+          res.status(404).json({ message: err.message });
+          return;
+        }
+        if (err.statusCode === 400) {
+          res.status(400).json({ message: err.message });
+          return;
+        }
+        throw e;
+      }
     } catch (error) {
       next(error);
     }
@@ -207,7 +345,11 @@ resultsRouter.post(
       }
 
       try {
-        const stats = await persistExamCorrection(data.answerSheetId, data.answers);
+        const normalizedAnswers = data.answers.map((answer) => ({
+          questionId: answer.questionId,
+          markedAnswer: answer.markedAnswer,
+        }));
+        const stats = await persistExamCorrection(data.answerSheetId, normalizedAnswers, "MANUAL");
         res.json({
           total: data.answers.length,
           totalEffective: stats.totalEffective,
@@ -283,7 +425,12 @@ resultsRouter.post(
       }
 
       try {
-        const stats = await persistExamCorrection(data.answerSheetId, answers);
+        const normalizedAnswers = data.marks.map((mark, index) => ({
+          order: mark.order,
+          questionId: answers[index]?.questionId,
+          markedAnswer: mark.markedAnswer,
+        }));
+        const stats = await persistExamCorrection(data.answerSheetId, normalizedAnswers, "MANUAL");
         res.json({
           total: answers.length,
           totalEffective: stats.totalEffective,
@@ -292,6 +439,222 @@ resultsRouter.post(
         });
       } catch (e) {
         const err = e as { statusCode?: number; message?: string };
+        if (err.statusCode === 400) {
+          res.status(400).json({ message: err.message });
+          return;
+        }
+        throw e;
+      }
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+resultsRouter.get(
+  "/answer-sheets/:id/scans",
+  requireAuth,
+  requireRole("admin", "gestor", "coordenador", "professor"),
+  async (req, res, next) => {
+    try {
+      const { id } = answerSheetIdParamSchema.parse(req.params);
+      const sheet = await AnswerSheetModel.findById(id).lean();
+      if (!sheet) {
+        res.status(404).json({ message: "Cartao nao encontrado." });
+        return;
+      }
+
+      const ok = await canAccessStudent(req.user!, String(sheet.studentId));
+      if (!ok) {
+        res.status(403).json({ message: "Acesso negado." });
+        return;
+      }
+
+      const scans = await AnswerSheetScanModel.find({ answerSheetId: sheet._id }).sort({ createdAt: -1 }).lean();
+      res.json(
+        scans.map((scan) => ({
+          id: String(scan._id),
+          processingStatus: scan.processingStatus,
+          scanType: scan.scanType,
+          createdAt: scan.createdAt,
+          selectedForResult: scan.selectedForResult,
+          url: buildPublicFileUrl(getBaseUrl(req), scan.storageKey),
+          parsedMarks: scan.parsedMarks,
+          omrMetrics: scan.omrMetrics,
+        })),
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+resultsRouter.post(
+  "/answer-sheets/:id/scans",
+  requireAuth,
+  requireRole("admin", "gestor", "coordenador", "professor"),
+  upload.single("file"),
+  async (req, res, next) => {
+    try {
+      const { id } = answerSheetIdParamSchema.parse(req.params);
+      const body = createAnswerSheetScanSchema.parse(req.body ?? {});
+      const sheet = await AnswerSheetModel.findById(id).lean();
+      if (!sheet) {
+        res.status(404).json({ message: "Cartao nao encontrado." });
+        return;
+      }
+
+      const ok = await canAccessStudent(req.user!, String(sheet.studentId));
+      if (!ok) {
+        res.status(403).json({ message: "Acesso negado." });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({ message: "Envie a imagem do cartao-resposta." });
+        return;
+      }
+
+      if (!req.file.mimetype.startsWith("image/")) {
+        res.status(400).json({ message: "O MVP atual aceita apenas imagens (foto ou scan) para OMR." });
+        return;
+      }
+
+      const saved = await saveBufferToStorage({
+        buffer: req.file.buffer,
+        relativeDir: `answer-sheets/${id}/scans`,
+        filename: req.file.originalname || "cartao-scan.png",
+      });
+
+      const scan = await AnswerSheetScanModel.create({
+        answerSheetId: sheet._id,
+        examId: sheet.examId,
+        studentId: sheet.studentId,
+        storageProvider: "LOCAL",
+        storageKey: saved.storageKey,
+        filename: req.file.originalname || "cartao-scan.png",
+        mimeType: req.file.mimetype,
+        sizeBytes: saved.sizeBytes,
+        uploadedBy: new Types.ObjectId(req.user!.id),
+        scanType: body.scanType ?? "PHOTO",
+        processingStatus: "PENDING",
+      });
+
+      const publicUrl = buildPublicFileUrl(getBaseUrl(req), scan.storageKey);
+      await AnswerSheetModel.updateOne(
+        { _id: sheet._id },
+        { $set: { uploadUrl: publicUrl, status: "SUBMITTED", processingStatus: "PENDING" } },
+      );
+
+      res.status(201).json({
+        id: String(scan._id),
+        url: publicUrl,
+        processingStatus: scan.processingStatus,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+resultsRouter.post(
+  "/answer-sheets/:id/scans/process",
+  requireAuth,
+  requireRole("admin", "gestor", "coordenador", "professor"),
+  async (req, res, next) => {
+    try {
+      const { id } = answerSheetIdParamSchema.parse(req.params);
+      const data = processAnswerSheetScanSchema.parse(req.body);
+      const sheet = await AnswerSheetModel.findById(id).lean();
+      if (!sheet) {
+        res.status(404).json({ message: "Cartao nao encontrado." });
+        return;
+      }
+
+      const ok = await canAccessStudent(req.user!, String(sheet.studentId));
+      if (!ok) {
+        res.status(403).json({ message: "Acesso negado." });
+        return;
+      }
+
+      const scan = await AnswerSheetScanModel.findOne({
+        _id: new Types.ObjectId(data.scanId),
+        answerSheetId: sheet._id,
+      }).lean();
+      if (!scan) {
+        res.status(404).json({ message: "Scan nao encontrado para este cartao." });
+        return;
+      }
+
+      const exam = await ExamModel.findById(sheet.examId).select("questionCount omrTemplateVersion").lean();
+      if (!exam) {
+        res.status(404).json({ message: "Prova nao encontrada." });
+        return;
+      }
+
+      await AnswerSheetScanModel.updateOne({ _id: scan._id }, { $set: { processingStatus: "PROCESSING" } });
+      await AnswerSheetModel.updateOne({ _id: sheet._id }, { $set: { processingStatus: "PROCESSING" } });
+
+      try {
+        const absolutePath = path.join(getUploadRoot(), scan.storageKey);
+        const omr = await runOmrOnImage({
+          absolutePath,
+          totalQuestions: exam.questionCount,
+          anchorSetVersion: exam.omrTemplateVersion,
+        });
+
+        await AnswerSheetScanModel.updateOne(
+          { _id: scan._id },
+          {
+            $set: {
+              processingStatus: omr.omrMetrics.confidence < 0.08 ? "NEEDS_REVIEW" : "DONE",
+              parsedMarks: omr.parsedMarks,
+              omrMetrics: omr.omrMetrics,
+              errorMessage: null,
+              selectedForResult: data.selectForResult ?? true,
+            },
+          },
+        );
+
+        if (data.selectForResult ?? true) {
+          await AnswerSheetScanModel.updateMany(
+            { answerSheetId: sheet._id, _id: { $ne: scan._id } },
+            { $set: { selectedForResult: false } },
+          );
+        }
+
+        const stats = await persistExamCorrection(
+          String(sheet._id),
+          omr.parsedMarks.map((mark) => ({
+            order: mark.order,
+            markedAnswer: mark.detectedAnswer,
+            confidence: mark.confidence,
+          })),
+          "OMR",
+          String(scan._id),
+        );
+
+        res.json({
+          scanId: String(scan._id),
+          totalEffective: stats.totalEffective,
+          correct: stats.correct,
+          percentage: stats.percentage,
+          omrMetrics: omr.omrMetrics,
+          parsedMarks: omr.parsedMarks,
+        });
+      } catch (e) {
+        const err = e as { message?: string; statusCode?: number };
+        await AnswerSheetScanModel.updateOne(
+          { _id: scan._id },
+          {
+            $set: {
+              processingStatus: "ERROR",
+              errorMessage: err.message ?? "Falha no processamento OMR.",
+            },
+          },
+        );
+        await AnswerSheetModel.updateOne({ _id: sheet._id }, { $set: { processingStatus: "ERROR", status: "ERROR" } });
+
         if (err.statusCode === 400) {
           res.status(400).json({ message: err.message });
           return;
@@ -418,7 +781,7 @@ resultsRouter.get(
       };
       if (examId) filter.examId = new Types.ObjectId(examId);
 
-      const sheets = await AnswerSheetModel.find(filter).select("_id studentId").lean();
+      const sheets = await AnswerSheetModel.find(filter).select("_id studentId examId").lean();
       const byStudent = new Map(students.map((s) => [String(s._id), s.fullName]));
 
       const rows: {

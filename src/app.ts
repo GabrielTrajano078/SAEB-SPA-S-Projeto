@@ -2,7 +2,9 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "path";
 import { ZodError } from "zod";
+import { getUploadRoot } from "./lib/file-storage";
 import { authRouter } from "./modules/auth/auth.routes";
 import { classesRouter } from "./modules/classes/classes.routes";
 import { examsRouter } from "./modules/exams/exams.routes";
@@ -17,6 +19,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: "5mb" }));
 app.use(morgan("dev"));
+app.use("/uploads", express.static(path.resolve(getUploadRoot())));
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });

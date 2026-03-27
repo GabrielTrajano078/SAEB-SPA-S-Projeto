@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { markedAnswerSchema, objectIdSchema } from "../common/schemas";
+import { answerSchema, markedAnswerSchema, objectIdSchema, processingStatusSchema, scanTypeSchema } from "../common/schemas";
 
 export const registerAnswerSheetSchema = z.object({
   examId: objectIdSchema,
@@ -13,7 +13,7 @@ export const submitCorrectionSchema = z.object({
     .array(
       z.object({
         questionId: objectIdSchema,
-        markedAnswer: markedAnswerSchema,
+        markedAnswer: answerSchema,
       }),
     )
     .min(1),
@@ -24,7 +24,7 @@ export const submitMarksByOrderSchema = z.object({
   marks: z.array(
     z.object({
       order: z.number().int().min(1),
-      markedAnswer: markedAnswerSchema,
+      markedAnswer: answerSchema,
     }),
   ),
 });
@@ -72,5 +72,19 @@ export const answerSheetIdParamSchema = z.object({
 
 export const patchAnswerSheetSchema = z.object({
   uploadUrl: z.string().url().optional(),
-  processingStatus: z.enum(["PENDING", "PROCESSING", "DONE", "ERROR"]).optional(),
+  processingStatus: processingStatusSchema.optional(),
+});
+
+export const answerSheetScanParamsSchema = z.object({
+  id: objectIdSchema,
+  scanId: objectIdSchema.optional(),
+});
+
+export const createAnswerSheetScanSchema = z.object({
+  scanType: scanTypeSchema.optional(),
+});
+
+export const processAnswerSheetScanSchema = z.object({
+  scanId: objectIdSchema,
+  selectForResult: z.boolean().optional(),
 });

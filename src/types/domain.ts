@@ -18,3 +18,12 @@ export type CurriculumAxis =
   | "GRANDEZAS_MEDIDAS";
 
 export type ExamType = "PERSONALIZADA" | "RECUPERACAO" | "SIMULADO";
+export type ExamSourceType = "QUESTION_BANK" | "PDF_IMPORT";
+export type ExamStatus = "DRAFT" | "READY" | "APPLIED" | "CLOSED";
+export type FileStorageProvider = "LOCAL" | "S3" | "GCS";
+export type ExamFileKind = "ORIGINAL_PDF" | "ANSWER_SHEET_BATCH_PDF" | "ANSWER_SHEET_SINGLE_PDF";
+export type AnswerSheetStatus = "GENERATED" | "PRINTED" | "SUBMITTED" | "PROCESSED" | "ERROR";
+export type ProcessingStatus = "PENDING" | "PROCESSING" | "DONE" | "ERROR";
+export type ScanType = "PHOTO" | "SCAN" | "PDF_PAGE";
+export type ScanReviewStatus = ProcessingStatus | "NEEDS_REVIEW";
+export type CorrectionSource = "MANUAL" | "OMR";

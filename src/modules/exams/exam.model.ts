@@ -13,8 +13,14 @@ interface ExamDocument {
   grade: "5" | "9";
   framework: "SAEB" | "SPAS";
   examType: "PERSONALIZADA" | "RECUPERACAO" | "SIMULADO";
+  sourceType: "QUESTION_BANK" | "PDF_IMPORT";
+  status: "DRAFT" | "READY" | "APPLIED" | "CLOSED";
   /** Código impresso no cartão-resposta. */
   examCode: string;
+  originalPdfFileId: Types.ObjectId | null;
+  officialAnswerKeyId: Types.ObjectId | null;
+  omrTemplateVersion: number;
+  questionCount: number;
   /** Questões anuladas após aplicação (gabarito ignora / marcação N/A). */
   voidedQuestionIds: Types.ObjectId[];
   createdBy: Types.ObjectId;
@@ -44,12 +50,41 @@ const examSchema = new Schema<ExamDocument>(
       default: "PERSONALIZADA",
       index: true,
     },
+    sourceType: {
+      type: String,
+      required: true,
+      enum: ["QUESTION_BANK", "PDF_IMPORT"],
+      default: "QUESTION_BANK",
+      index: true,
+    },
+    status: {
+      type: String,
+      required: true,
+      enum: ["DRAFT", "READY", "APPLIED", "CLOSED"],
+      default: "DRAFT",
+      index: true,
+    },
     examCode: { type: String, required: true, unique: true, sparse: true, index: true },
+    originalPdfFileId: { type: Schema.Types.ObjectId, ref: "ExamFile", default: null },
+    officialAnswerKeyId: { type: Schema.Types.ObjectId, ref: "OfficialAnswerKey", default: null },
+    omrTemplateVersion: { type: Number, required: true, default: 1, min: 1 },
+    questionCount: { type: Number, required: true, min: 1 },
     voidedQuestionIds: { type: [Schema.Types.ObjectId], default: [] },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    questions: { type: [examQuestionSchema], required: true, validate: (value: ExamQuestion[]) => value.length > 0 },
+    questions: {
+      type: [examQuestionSchema],
+      default: [],
+      validate: {
+        validator(this: ExamDocument, value: ExamQuestion[]) {
+          return this.sourceType === "PDF_IMPORT" || value.length > 0;
+        },
+        message: "Provas do banco de questoes precisam conter ao menos uma questao.",
+      },
+    },
   },
   { timestamps: true },
 );
+
+examSchema.index({ classroomId: 1, status: 1, createdAt: -1 });
 
 export const ExamModel = model<ExamDocument>("Exam", examSchema);
