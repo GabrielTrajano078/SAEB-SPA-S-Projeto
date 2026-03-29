@@ -8,7 +8,6 @@ import { ClassesPage } from "@/pages/ClassesPage";
 import { ExamDetailPage } from "@/pages/ExamDetailPage";
 import { ExamNewPage } from "@/pages/ExamNewPage";
 import { ExamsPage } from "@/pages/ExamsPage";
-import { HomePage } from "@/pages/HomePage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MunicipalityPage } from "@/pages/MunicipalityPage";
 import { QuestionNewPage } from "@/pages/QuestionNewPage";
@@ -34,7 +33,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<HomePage />} />
+              <Route index element={<Navigate to="/questoes" replace />} />
               <Route path="questoes" element={<QuestionsPage />} />
               <Route
                 path="questoes/nova"

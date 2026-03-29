@@ -177,7 +177,11 @@ export const openApiDocument = {
             ],
             example: "LEITURA",
           },
-          difficulty: { type: "string", enum: ["FACIL", "MEDIO", "DIFICIL"], example: "FACIL" },
+          difficulty: {
+            type: "string",
+            enum: ["MUITO_FACIL", "FACIL", "MEDIO", "DIFICIL", "MUITO_DIFICIL"],
+            example: "FACIL",
+          },
           prompt: { type: "string", example: "Qual e a finalidade principal do texto apresentado?" },
           optionA: { type: "string", example: "Contar uma historia." },
           optionB: { type: "string", example: "Dar uma instrucao." },
@@ -550,7 +554,14 @@ export const openApiDocument = {
           { name: "framework", in: "query", schema: { type: "string", enum: ["SAEB", "SPAS"] } },
           { name: "descriptor", in: "query", schema: { type: "string" } },
           { name: "axis", in: "query", schema: { type: "string" } },
-          { name: "difficulty", in: "query", schema: { type: "string", enum: ["FACIL", "MEDIO", "DIFICIL"] } },
+          {
+            name: "difficulty",
+            in: "query",
+            schema: {
+              type: "string",
+              enum: ["MUITO_FACIL", "FACIL", "MEDIO", "DIFICIL", "MUITO_DIFICIL"],
+            },
+          },
         ],
         responses: {
           200: { description: "Lista de questoes" },

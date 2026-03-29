@@ -4,15 +4,13 @@ import type { User } from "@/schemas/auth";
 
 function navForRole(role: User["role"]) {
   const base = [
-    { to: "/", label: "Início" },
-    { to: "/provas", label: "Provas" },
+    { to: "/provas", label: "Avaliação" },
     { to: "/questoes", label: "Banco de questões" },
     { to: "/turmas", label: "Turmas" },
     { to: "/alunos", label: "Alunos" },
   ];
   const extra: { to: string; label: string }[] = [];
   if (role === "admin") {
-    extra.push({ to: "/questoes/nova", label: "Nova questão" });
     extra.push({ to: "/escolas", label: "Escolas" });
   }
   if (role === "gestor") {
@@ -35,37 +33,32 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <div>
-          <h1>SAEB / SPA-S</h1>
-          <p className="muted small">
-            {user.fullName} · {user.email} · {user.role}
-          </p>
+      <aside className="sidebar" aria-label="Navegação">
+        <div className="sidebar-brand">
+          <span className="sidebar-title">SAEB / SPA-S</span>
         </div>
-        <div className="topbar-actions">
-          <a className="link" href="/docs" target="_blank" rel="noreferrer">
-            API docs
-          </a>
-          <button type="button" className="ghost" onClick={logout}>
+        <nav className="sidebar-nav" aria-label="Principal">
+          {links.map((l) => (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) => (isActive ? "nav-link nav-link-side active" : "nav-link nav-link-side")}
+            >
+              {l.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <button type="button" className="ghost sidebar-logout" onClick={logout}>
             Sair
           </button>
         </div>
-      </header>
-      <nav className="nav-main" aria-label="Principal">
-        {links.map((l) => (
-          <NavLink
-            key={l.to}
-            to={l.to}
-            end={l.to === "/"}
-            className={({ isActive }) => (isActive ? "nav-link active" : "nav-link")}
-          >
-            {l.label}
-          </NavLink>
-        ))}
-      </nav>
-      <main className="content content-wide">
-        <Outlet />
-      </main>
+      </aside>
+      <div className="app-main">
+        <main className="content content-wide">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

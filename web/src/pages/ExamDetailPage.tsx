@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { fetchExam, generateAnswerSheets, listExamAnswerSheets, publishAnswerKey } from "@/api/exams";
 import { processAnswerSheetScan, uploadAnswerSheetScan } from "@/api/results";
 import { ApiError } from "@/lib/api-client";
+import { disciplineLabel } from "@/lib/discipline";
 
 export function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -74,7 +75,8 @@ export function ExamDetailPage() {
           <>
             <h2>{exam.title}</h2>
             <p className="muted">
-              Código <span className="badge">{exam.examCode}</span> · {exam.discipline} {exam.grade}º · {exam.framework} ·{" "}
+              Código <span className="badge">{exam.examCode}</span> · {disciplineLabel(exam.discipline)} {exam.grade}º ·{" "}
+              {exam.framework} ·{" "}
               {exam.examType ?? "—"} · Status {exam.status ?? "—"}
             </p>
             <p className="small">

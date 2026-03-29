@@ -17,7 +17,7 @@ import { StudentModel } from "../modules/students/student.model";
 type SeedQuestion = {
   descriptor: string;
   axis: "LEITURA" | "INTERPRETACAO" | "GENEROS_TEXTUAIS" | "LINGUA_ESTUDO";
-  difficulty: "FACIL" | "MEDIO" | "DIFICIL";
+  difficulty: "MUITO_FACIL" | "FACIL" | "MEDIO" | "DIFICIL" | "MUITO_DIFICIL";
   prompt: string;
   optionA: string;
   optionB: string;

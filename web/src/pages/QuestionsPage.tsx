@@ -4,18 +4,9 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listQuestions } from "@/api/questions";
 import { ApiError } from "@/lib/api-client";
-
-const AXES = [
-  "LEITURA",
-  "INTERPRETACAO",
-  "GENEROS_TEXTUAIS",
-  "LINGUA_ESTUDO",
-  "NUMEROS",
-  "ALGEBRA",
-  "GEOMETRIA",
-  "ESTATISTICA",
-  "GRANDEZAS_MEDIDAS",
-] as const;
+import { disciplineLabel } from "@/lib/discipline";
+import { difficultyLabel, type ApiDifficulty } from "@/lib/difficulty";
+import { axisLabel, CURRICULUM_AXIS_CODES, type CurriculumAxisCode } from "@/lib/curriculum-axis";
 
 export function QuestionsPage() {
   const { state } = useAuth();
@@ -23,8 +14,8 @@ export function QuestionsPage() {
   const [grade, setGrade] = useState<"" | "5" | "9">("");
   const [framework, setFramework] = useState<"" | "SAEB" | "SPAS">("");
   const [descriptor, setDescriptor] = useState("");
-  const [axis, setAxis] = useState<"" | (typeof AXES)[number]>("");
-  const [difficulty, setDifficulty] = useState<"" | "FACIL" | "MEDIO" | "DIFICIL">("");
+  const [axis, setAxis] = useState<"" | CurriculumAxisCode>("");
+  const [difficulty, setDifficulty] = useState<"" | ApiDifficulty>("");
 
   const filters = useMemo(
     () => ({
@@ -65,8 +56,8 @@ export function QuestionsPage() {
             Disciplina
             <select value={discipline} onChange={(e) => setDiscipline(e.target.value as typeof discipline)}>
               <option value="">Todas</option>
-              <option value="LP">LP</option>
-              <option value="MAT">MAT</option>
+              <option value="LP">Língua Portuguesa</option>
+              <option value="MAT">Matemática</option>
             </select>
           </label>
           <label className="field">
@@ -89,9 +80,11 @@ export function QuestionsPage() {
             Dificuldade
             <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}>
               <option value="">Todas</option>
+              <option value="MUITO_FACIL">Muito fácil</option>
               <option value="FACIL">Fácil</option>
               <option value="MEDIO">Médio</option>
               <option value="DIFICIL">Difícil</option>
+              <option value="MUITO_DIFICIL">Muito difícil</option>
             </select>
           </label>
           <label className="field" style={{ gridColumn: "span 2" }}>
@@ -102,9 +95,9 @@ export function QuestionsPage() {
             Eixo
             <select value={axis} onChange={(e) => setAxis(e.target.value as typeof axis)}>
               <option value="">Todos</option>
-              {AXES.map((a) => (
-                <option key={a} value={a}>
-                  {a}
+              {CURRICULUM_AXIS_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {axisLabel(code)}
                 </option>
               ))}
             </select>
@@ -125,9 +118,8 @@ export function QuestionsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>ID</th>
-                  <th>Disc.</th>
-                  <th>Ano</th>
+                  <th>Disciplina</th>
+                  <th>Série</th>
                   <th>Matriz</th>
                   <th>Descritor</th>
                   <th>Dif.</th>
@@ -137,12 +129,11 @@ export function QuestionsPage() {
               <tbody>
                 {q.data.map((row) => (
                   <tr key={row._id}>
-                    <td className="small muted">{row._id.slice(-6)}</td>
-                    <td>{row.discipline}</td>
+                    <td>{disciplineLabel(row.discipline)}</td>
                     <td>{row.grade}</td>
                     <td>{row.framework}</td>
                     <td>{row.descriptor}</td>
-                    <td>{row.difficulty}</td>
+                    <td>{difficultyLabel(row.difficulty)}</td>
                     <td style={{ maxWidth: 320 }}>{row.prompt.slice(0, 120)}{row.prompt.length > 120 ? "…" : ""}</td>
                   </tr>
                 ))}

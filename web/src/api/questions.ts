@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
+import type { ApiDifficulty } from "@/lib/difficulty";
 
 export type QuestionListItem = {
   _id: string;
@@ -7,7 +8,7 @@ export type QuestionListItem = {
   framework: "SAEB" | "SPAS";
   descriptor: string;
   axis?: string;
-  difficulty: "FACIL" | "MEDIO" | "DIFICIL";
+  difficulty: ApiDifficulty;
   prompt: string;
   optionA: string;
   optionB: string;
@@ -21,7 +22,7 @@ export async function listQuestions(params: {
   framework?: "SAEB" | "SPAS";
   descriptor?: string;
   axis?: string;
-  difficulty?: "FACIL" | "MEDIO" | "DIFICIL";
+  difficulty?: ApiDifficulty;
 }): Promise<QuestionListItem[]> {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -60,7 +61,7 @@ export type CreateQuestionBody = {
   framework: "SAEB" | "SPAS";
   descriptor: string;
   axis?: string;
-  difficulty: "FACIL" | "MEDIO" | "DIFICIL";
+  difficulty: ApiDifficulty;
   prompt: string;
   optionA: string;
   optionB: string;

@@ -206,8 +206,8 @@ export function ExamNewPage() {
           <label className="field">
             Disciplina
             <select value={discipline} onChange={(e) => setDiscipline(e.target.value as typeof discipline)}>
-              <option value="LP">LP</option>
-              <option value="MAT">MAT</option>
+              <option value="LP">Língua Portuguesa</option>
+              <option value="MAT">Matemática</option>
             </select>
           </label>
           <label className="field">

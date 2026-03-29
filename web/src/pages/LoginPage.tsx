@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { ApiError } from "@/lib/api-client";
 import { loginFormSchema, type LoginFormValues } from "@/schemas/auth";
 
 export function LoginPage() {
   const { state, login } = useAuth();
-  const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   const [values, setValues] = useState<LoginFormValues>({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +22,7 @@ export function LoginPage() {
   }
 
   if (state.status === "authenticated") {
-    return <Navigate to={from === "/login" ? "/" : from} replace />;
+    return <Navigate to="/questoes" replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {

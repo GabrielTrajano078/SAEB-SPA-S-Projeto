@@ -7,7 +7,7 @@ interface QuestionDocument {
   descriptor: string;
   /** Eixo curricular para relatórios (desempenho por eixo). */
   axis?: string;
-  difficulty: "FACIL" | "MEDIO" | "DIFICIL";
+  difficulty: "MUITO_FACIL" | "FACIL" | "MEDIO" | "DIFICIL" | "MUITO_DIFICIL";
   prompt: string;
   optionA: string;
   optionB: string;
@@ -23,7 +23,12 @@ const questionSchema = new Schema<QuestionDocument>(
     framework: { type: String, required: true, enum: ["SAEB", "SPAS"], index: true },
     descriptor: { type: String, required: true, index: true },
     axis: { type: String, index: true },
-    difficulty: { type: String, required: true, enum: ["FACIL", "MEDIO", "DIFICIL"], index: true },
+    difficulty: {
+      type: String,
+      required: true,
+      enum: ["MUITO_FACIL", "FACIL", "MEDIO", "DIFICIL", "MUITO_DIFICIL"],
+      index: true,
+    },
     prompt: { type: String, required: true },
     optionA: { type: String, required: true },
     optionB: { type: String, required: true },

@@ -1,5 +1,6 @@
 :root {
   color-scheme: light dark;
+  --sidebar-width: 15.5rem;
   --bg: #0f1419;
   --surface: #1a222c;
   --border: #2d3845;
@@ -37,29 +38,82 @@ a:hover {
 
 .app-shell {
   min-height: 100vh;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: var(--sidebar-width);
+  height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
-}
-
-.topbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
   background: var(--surface);
+  overflow: hidden;
 }
 
-.topbar h1 {
-  margin: 0;
-  font-size: 1.25rem;
+.sidebar-brand {
+  padding: 1.1rem 1rem 1rem;
+  border-bottom: 1px solid var(--border);
 }
 
-.topbar-actions {
+.sidebar-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.sidebar-nav {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.65rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.nav-link-side {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  line-height: 1.35;
+}
+
+.nav-link-side:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.nav-link-side.active {
+  color: var(--accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.sidebar-footer {
+  padding: 1rem 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-logout {
+  align-self: flex-start;
+}
+
+.app-main {
+  margin-left: var(--sidebar-width);
+  min-width: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .content {
@@ -71,15 +125,9 @@ a:hover {
 
 .content-wide {
   max-width: 1200px;
-}
-
-.nav-main {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  padding: 0.65rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  margin: 0;
+  width: 100%;
+  flex: 1;
 }
 
 .nav-link {

@@ -3,19 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createQuestion, type CreateQuestionBody } from "@/api/questions";
 import { ApiError } from "@/lib/api-client";
-
-const AXES = [
-  "",
-  "LEITURA",
-  "INTERPRETACAO",
-  "GENEROS_TEXTUAIS",
-  "LINGUA_ESTUDO",
-  "NUMEROS",
-  "ALGEBRA",
-  "GEOMETRIA",
-  "ESTATISTICA",
-  "GRANDEZAS_MEDIDAS",
-] as const;
+import { axisLabel, CURRICULUM_AXIS_CODES } from "@/lib/curriculum-axis";
 
 export function QuestionNewPage() {
   const navigate = useNavigate();
@@ -76,8 +64,8 @@ export function QuestionNewPage() {
               value={form.discipline}
               onChange={(e) => setForm((f) => ({ ...f, discipline: e.target.value as CreateQuestionBody["discipline"] }))}
             >
-              <option value="LP">LP</option>
-              <option value="MAT">MAT</option>
+              <option value="LP">Língua Portuguesa</option>
+              <option value="MAT">Matemática</option>
             </select>
           </label>
           <label className="field">
@@ -106,9 +94,11 @@ export function QuestionNewPage() {
               value={form.difficulty}
               onChange={(e) => setForm((f) => ({ ...f, difficulty: e.target.value as CreateQuestionBody["difficulty"] }))}
             >
+              <option value="MUITO_FACIL">Muito fácil</option>
               <option value="FACIL">Fácil</option>
               <option value="MEDIO">Médio</option>
               <option value="DIFICIL">Difícil</option>
+              <option value="MUITO_DIFICIL">Muito difícil</option>
             </select>
           </label>
           <label className="field">
@@ -118,9 +108,10 @@ export function QuestionNewPage() {
           <label className="field">
             Eixo (opcional)
             <select value={axis} onChange={(e) => setAxis(e.target.value)}>
-              {AXES.map((a) => (
-                <option key={a || "none"} value={a}>
-                  {a || "—"}
+              <option value="">nenhum</option>
+              {CURRICULUM_AXIS_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {axisLabel(code)}
                 </option>
               ))}
             </select>

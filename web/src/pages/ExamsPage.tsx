@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listExams } from "@/api/exams";
 import { ApiError } from "@/lib/api-client";
+import { disciplineLabel } from "@/lib/discipline";
 
 export function ExamsPage() {
   const { state } = useAuth();
@@ -41,7 +42,7 @@ export function ExamsPage() {
                 <tr>
                   <th>Título</th>
                   <th>Código</th>
-                  <th>Disc. / Ano</th>
+                  <th>Disciplina / Ano</th>
                   <th>Tipo</th>
                   <th>Status</th>
                   <th>Qtd</th>
@@ -56,7 +57,7 @@ export function ExamsPage() {
                       <span className="badge">{e.examCode ?? "—"}</span>
                     </td>
                     <td>
-                      {e.discipline} · {e.grade}º
+                      {disciplineLabel(e.discipline)} · {e.grade}º
                     </td>
                     <td>{e.examType ?? "—"}</td>
                     <td>{e.status ?? "—"}</td>
