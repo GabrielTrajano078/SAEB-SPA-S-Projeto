@@ -2,13 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import type { QuestionListItem } from "@/api/questions";
 import { listQuestions } from "@/api/questions";
 import { ApiError } from "@/lib/api-client";
+import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
 import { disciplineLabel } from "@/lib/discipline";
 import { axisLabel, CURRICULUM_AXIS_CODES, type CurriculumAxisCode } from "@/lib/curriculum-axis";
 
 export function QuestionsPage() {
   const { state } = useAuth();
+  const [preview, setPreview] = useState<QuestionListItem | null>(null);
   const [discipline, setDiscipline] = useState<"" | "LP" | "MAT">("");
   const [grade, setGrade] = useState<"" | "5" | "9">("");
   const [framework, setFramework] = useState<"" | "SAEB">("");
@@ -37,6 +40,7 @@ export function QuestionsPage() {
 
   return (
     <div>
+      <QuestionPreviewModal question={preview} onClose={() => setPreview(null)} />
       <section className="panel">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
           <h2 style={{ margin: 0 }}>Banco de questões</h2>
@@ -99,25 +103,35 @@ export function QuestionsPage() {
         ) : null}
         {q.data && q.data.length === 0 ? <p className="muted">Nenhuma questão com esses filtros (máx. 200 itens).</p> : null}
         {q.data && q.data.length > 0 ? (
-          <div className="table-wrap">
-            <table className="data-table">
+          <div className="table-wrap table-wrap--questions">
+            <table className="data-table data-table--questions">
               <thead>
                 <tr>
                   <th>Disciplina</th>
-                  <th>Série</th>
-                  <th>Matriz</th>
+                  <th>Ano</th>
                   <th>Descritor</th>
-                  <th>Enunciado</th>
+                  <th>Eixo</th>
+                  <th>Prévia do enunciado</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {q.data.map((row) => (
                   <tr key={row._id}>
                     <td>{disciplineLabel(row.discipline)}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.framework}</td>
-                    <td>{row.descriptor}</td>
-                    <td style={{ maxWidth: 320 }}>{row.prompt.slice(0, 120)}{row.prompt.length > 120 ? "…" : ""}</td>
+                    <td>{row.grade}º</td>
+                    <td>
+                      <code className="descriptor-pill">{row.descriptor}</code>
+                    </td>
+                    <td className="muted small">{row.axis ? axisLabel(row.axis) : "—"}</td>
+                    <td>
+                      <p className="question-preview-cell">{row.prompt}</p>
+                    </td>
+                    <td>
+                      <button type="button" className="ghost btn-compact" onClick={() => setPreview(row)}>
+                        Abrir
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

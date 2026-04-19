@@ -26,3 +26,7 @@ export type CreateStudentBody = {
 export async function createStudent(body: CreateStudentBody): Promise<{ id: string }> {
   return apiFetch("/api/students", { method: "POST", body });
 }
+
+export async function deleteStudent(id: string): Promise<void> {
+  await apiFetch<null>(`/api/students/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
