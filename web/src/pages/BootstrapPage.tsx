@@ -42,12 +42,20 @@ export function BootstrapPage() {
 
   return (
     <main className="auth-layout">
-      <section className="card">
-        <h1>Criar administrador</h1>
-        <p className="muted">Disponível apenas quando ainda não existem usuários na base.</p>
-        <form onSubmit={handleSubmit} className="stack">
+      <div className="app-canvas" aria-hidden="true" />
+      <section className="auth-card">
+        <header className="auth-card-header">
+          <div className="auth-logo" aria-hidden="true">
+            <span className="auth-logo-mark">S</span>
+          </div>
+          <div className="auth-card-titles">
+            <h1>Criar administrador</h1>
+            <p className="auth-subtitle">Somente quando ainda não existem usuários na base.</p>
+          </div>
+        </header>
+        <form onSubmit={handleSubmit} className="stack auth-form">
           <label className="field">
-            <span>Nome completo</span>
+            <span className="field-label">Nome completo</span>
             <input
               value={values.fullName}
               onChange={(e) => setValues((v) => ({ ...v, fullName: e.target.value }))}
@@ -55,7 +63,7 @@ export function BootstrapPage() {
             />
           </label>
           <label className="field">
-            <span>E-mail</span>
+            <span className="field-label">E-mail</span>
             <input
               type="email"
               autoComplete="username"
@@ -65,7 +73,7 @@ export function BootstrapPage() {
             />
           </label>
           <label className="field">
-            <span>Senha</span>
+            <span className="field-label">Senha</span>
             <input
               type="password"
               autoComplete="new-password"
@@ -85,11 +93,11 @@ export function BootstrapPage() {
               {success}
             </p>
           ) : null}
-          <button type="submit" className="primary" disabled={submitting}>
+          <button type="submit" className="primary auth-submit" disabled={submitting}>
             {submitting ? "Criando…" : "Criar administrador"}
           </button>
         </form>
-        <p className="muted small">
+        <p className="auth-footer-link">
           <Link to="/login">Voltar ao login</Link>
         </p>
       </section>

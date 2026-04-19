@@ -22,7 +22,7 @@ export function DashboardPage() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <h1>SAEB / SPA-S</h1>
+          <h1>Diagnóstico SAEB</h1>
           <p className="muted small">
             {user.fullName} · {user.email} · {user.role}
           </p>

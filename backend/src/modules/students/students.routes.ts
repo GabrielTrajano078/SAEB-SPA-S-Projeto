@@ -1,8 +1,11 @@
 import { Types } from "mongoose";
 import { Router } from "express";
-import { canAccessClassroom, canAccessSchool } from "../../lib/access";
+import { canAccessClassroom, canAccessSchool, canAccessStudent } from "../../lib/access";
 import { requireAuth, requireRole } from "../../middlewares/auth";
 import { ClassroomModel } from "../classes/classroom.model";
+import { AnswerSheetModel } from "../results/answer-sheet.model";
+import { AnswerSheetScanModel } from "../results/answer-sheet-scan.model";
+import { ResultModel } from "../results/result.model";
 import { StudentModel } from "./student.model";
 import { createStudentSchema, listStudentsSchema } from "./students.schemas";
 
@@ -86,6 +89,43 @@ studentsRouter.post(
 
       const student = await StudentModel.create(data);
       res.status(201).json({ id: String(student._id) });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+studentsRouter.delete(
+  "/:id",
+  requireAuth,
+  requireRole("admin", "gestor", "coordenador", "professor"),
+  async (req, res, next) => {
+    try {
+      const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      if (!rawId || !Types.ObjectId.isValid(rawId)) {
+        res.status(400).json({ message: "ID invalido." });
+        return;
+      }
+
+      const allowed = await canAccessStudent(req.user!, rawId);
+      if (!allowed) {
+        res.status(403).json({ message: "Acesso negado a este aluno." });
+        return;
+      }
+
+      const existing = await StudentModel.findById(rawId).select("_id").lean();
+      if (!existing) {
+        res.status(404).json({ message: "Aluno nao encontrado." });
+        return;
+      }
+
+      const studentId = new Types.ObjectId(rawId);
+      await ResultModel.deleteMany({ studentId });
+      await AnswerSheetScanModel.deleteMany({ studentId });
+      await AnswerSheetModel.deleteMany({ studentId });
+      await StudentModel.deleteOne({ _id: studentId });
+
+      res.status(204).send();
     } catch (error) {
       next(error);
     }
