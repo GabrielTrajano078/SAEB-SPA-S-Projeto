@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Classroom } from "@/api/classes";
 import { ApiError } from "@/lib/api-client";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { User } from "@/schemas/auth";
 
@@ -41,7 +42,13 @@ export function RegisteredClassesTable({
       <EmptyState
         title="Nenhuma turma cadastrada"
         description="Cadastre uma turma ou importe uma planilha para começar."
-        action={canCreate ? <span className="muted small">Use o formulário «Nova turma» acima.</span> : null}
+        action={
+          canCreate ? (
+            <Button asChild variant="primary">
+              <Link to="/turmas/nova">Nova turma</Link>
+            </Button>
+          ) : null
+        }
       />
     );
   }

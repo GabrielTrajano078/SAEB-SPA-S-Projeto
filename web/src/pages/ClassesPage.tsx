@@ -1,33 +1,32 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { createClassroom, listClassrooms } from "@/api/classes";
+import { listClassrooms } from "@/api/classes";
 import { listSchools } from "@/api/schools";
-import { ApiError } from "@/lib/api-client";
-import { useEffect, useMemo, useState } from "react";
-import { ClassesSchoolFilter } from "./classes/ClassesSchoolFilter";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { ClassesListFilters } from "./classes/ClassesListFilters";
+import { ClassroomImportPanel } from "./classes/ClassroomImportPanel";
 import {
   importClassroomsFromWorkbook,
   type ClassroomImportReport,
 } from "./classes/classroom-import-workbook";
-import { NewClassroomForm } from "./classes/NewClassroomForm";
 import { RegisteredClassesTable } from "./classes/RegisteredClassesTable";
 
 export function ClassesPage() {
   const qc = useQueryClient();
   const { state } = useAuth();
   const [schoolFilter, setSchoolFilter] = useState("");
-  const [schoolId, setSchoolId] = useState("");
-  const [name, setName] = useState("");
-  const [grade, setGrade] = useState<"5" | "9">("5");
-  const [formError, setFormError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [nameContains, setNameContains] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [importReport, setImportReport] = useState<ClassroomImportReport | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const user = state.status === "authenticated" ? state.user : null;
   const canCreate = user && (user.role === "admin" || user.role === "gestor" || user.role === "coordenador");
-  const isCoord = user?.role === "coordenador";
   const needsSchoolPicker = user && (user.role === "admin" || user.role === "gestor");
+  const isCoord = user?.role === "coordenador";
 
   const schoolsQ = useQuery({
     queryKey: ["schools"],
@@ -35,15 +34,18 @@ export function ClassesPage() {
     enabled: state.status === "authenticated" && Boolean(needsSchoolPicker),
   });
 
-  useEffect(() => {
-    if (isCoord && user?.schoolId) {
-      setSchoolId(user.schoolId);
-    }
-  }, [isCoord, user?.schoolId]);
+  const listClassroomParams = useMemo(() => {
+    const p: { schoolId?: string; grade?: "5" | "9"; nameContains?: string } = {};
+    if (schoolFilter) p.schoolId = schoolFilter;
+    if (gradeFilter === "5" || gradeFilter === "9") p.grade = gradeFilter;
+    const q = nameContains.trim();
+    if (q) p.nameContains = q;
+    return Object.keys(p).length > 0 ? p : undefined;
+  }, [schoolFilter, gradeFilter, nameContains]);
 
   const classesQ = useQuery({
-    queryKey: ["classes", "page", schoolFilter],
-    queryFn: () => listClassrooms(schoolFilter ? { schoolId: schoolFilter } : undefined),
+    queryKey: ["classes", "page", schoolFilter, gradeFilter, nameContains],
+    queryFn: () => listClassrooms(listClassroomParams),
     enabled: state.status === "authenticated",
   });
 
@@ -55,23 +57,9 @@ export function ClassesPage() {
     return m;
   }, [schoolsQ.data]);
 
-  const createM = useMutation({
-    mutationFn: createClassroom,
-    onSuccess: () => {
-      setSuccess("Turma cadastrada.");
-      setFormError(null);
-      setName("");
-      void qc.invalidateQueries({ queryKey: ["classes"] });
-    },
-    onError: (err: unknown) => {
-      setSuccess(null);
-      setFormError(err instanceof ApiError ? err.message : "Não foi possível cadastrar.");
-    },
-  });
-
-  function resolveSchoolIdForCreate(): string | null {
+  function resolveSchoolIdForImport(): string | null {
     if (needsSchoolPicker) {
-      return schoolId.trim() || null;
+      return schoolFilter.trim() || null;
     }
     if (isCoord) {
       return user?.schoolId ?? null;
@@ -80,15 +68,18 @@ export function ClassesPage() {
   }
 
   async function handleClassroomExcel(file: File) {
-    const sid = resolveSchoolIdForCreate();
+    const sid = resolveSchoolIdForImport();
     if (!sid) {
-      setFormError("Selecione a escola antes de importar.");
+      setImportError(
+        needsSchoolPicker
+          ? "Selecione uma escola no filtro «Escola» acima (não use «Todas»)."
+          : "Conta sem escola vinculada.",
+      );
       return;
     }
     setImportBusy(true);
     setImportReport(null);
-    setFormError(null);
-    setSuccess(null);
+    setImportError(null);
     try {
       const report = await importClassroomsFromWorkbook(file, sid);
       setImportReport(report);
@@ -96,28 +87,16 @@ export function ClassesPage() {
         void qc.invalidateQueries({ queryKey: ["classes"] });
       }
     } catch {
-      setFormError("Não foi possível ler a planilha. Use .xlsx ou .xls e a primeira aba com colunas nome e ano.");
+      setImportError(
+        "Não foi possível ler a planilha. Use .xlsx ou .xls e a primeira aba com colunas nome e ano.",
+      );
     } finally {
       setImportBusy(false);
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-    setSuccess(null);
-    const sid = schoolId.trim();
-    if (!sid) {
-      setFormError("Selecione a escola.");
-      return;
-    }
-    const n = name.trim();
-    if (!n) {
-      setFormError("Informe o nome da turma.");
-      return;
-    }
-    createM.mutate({ schoolId: sid, name: n, grade });
-  }
+  const importChooseDisabled =
+    importBusy || Boolean(isCoord && !user?.schoolId) || Boolean(needsSchoolPicker && !schoolFilter.trim());
 
   if (state.status !== "authenticated") {
     return null;
@@ -125,47 +104,57 @@ export function ClassesPage() {
 
   const { user: u } = state;
   const schools = schoolsQ.data ?? [];
-  const importChooseDisabled =
-    importBusy || (isCoord && !u.schoolId) || Boolean(needsSchoolPicker && !schoolId.trim());
 
   return (
     <div>
       <section className="panel">
-        <h2>Turmas</h2>
-        {u.role === "admin" || u.role === "gestor" ? (
-          <ClassesSchoolFilter schools={schools} value={schoolFilter} onValueChange={setSchoolFilter} />
-        ) : null}
+        <div className="section-header">
+          <h2>Turmas</h2>
+          {canCreate ? (
+            <Button asChild variant="primary">
+              <Link to="/turmas/nova">Nova turma</Link>
+            </Button>
+          ) : null}
+        </div>
+        <p className="muted small">
+          Filtros por escola (admin/gestor), ano e descrição (nome da turma). Para importar Excel, admin e gestor devem escolher uma escola
+          (não use «Todas»). Coordenador importa para a escola do perfil. Cadastro manual em Nova turma.
+        </p>
+        <ClassesListFilters
+          showSchool={u.role === "admin" || u.role === "gestor"}
+          schools={schools}
+          schoolId={schoolFilter}
+          onSchoolIdChange={setSchoolFilter}
+          grade={gradeFilter}
+          onGradeChange={setGradeFilter}
+          nameContains={nameContains}
+          onNameContainsChange={setNameContains}
+        />
 
         {canCreate ? (
-          <NewClassroomForm
-            schools={schools}
-            schoolId={schoolId}
-            onSchoolIdChange={setSchoolId}
-            name={name}
-            onNameChange={setName}
-            grade={grade}
-            onGradeChange={setGrade}
-            needsSchoolPicker={Boolean(needsSchoolPicker)}
-            isCoord={Boolean(isCoord)}
-            user={u}
-            formError={formError}
-            success={success}
-            createM={createM}
-            onSubmit={handleSubmit}
-            importBusy={importBusy}
-            importReport={importReport}
-            importChooseDisabled={importChooseDisabled}
-            onImportFile={(f) => void handleClassroomExcel(f)}
-          />
-        ) : (
-          <p className="muted small" style={{ marginTop: "0.75rem" }}>
+          <>
+            {importError ? (
+              <p className="error" role="alert" style={{ marginTop: "0.75rem", maxWidth: 480 }}>
+                {importError}
+              </p>
+            ) : null}
+            <ClassroomImportPanel
+              importBusy={importBusy}
+              importReport={importReport}
+              chooseFileDisabled={importChooseDisabled}
+              onFile={(f) => void handleClassroomExcel(f)}
+            />
+          </>
+        ) : null}
+
+        {canCreate ? null : (
+          <p className="muted small" style={{ marginTop: "1rem" }}>
             Apenas administrador, gestor ou coordenador podem cadastrar turmas.
           </p>
         )}
       </section>
 
       <section className="panel">
-        <h3 style={{ marginTop: 0, fontSize: "1.05rem" }}>Turmas cadastradas</h3>
         <RegisteredClassesTable
           isLoading={classesQ.isLoading}
           isError={classesQ.isError}

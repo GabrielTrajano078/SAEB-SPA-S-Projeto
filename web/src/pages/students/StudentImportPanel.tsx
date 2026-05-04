@@ -1,32 +1,32 @@
 import { useRef } from "react";
-import { downloadClassroomTemplate } from "@/lib/excel-import";
+import { downloadStudentTemplate } from "@/lib/excel-import";
 import { Button } from "@/components/ui/Button";
-import type { ClassroomImportReport } from "./classroom-import-workbook";
 
-export type ClassroomImportPanelProps = {
-  importBusy: boolean;
-  importReport: ClassroomImportReport | null;
-  chooseFileDisabled: boolean;
-  onFile: (file: File) => void;
+export type StudentImportReport = {
+  ok: number;
+  skipped: number;
+  errors: { line: number; message: string }[];
 };
 
-export function ClassroomImportPanel({
-  importBusy,
-  importReport,
-  chooseFileDisabled,
-  onFile,
-}: ClassroomImportPanelProps) {
+export type StudentImportPanelProps = Readonly<{
+  importBusy: boolean;
+  importReport: StudentImportReport | null;
+  chooseFileDisabled: boolean;
+  onFile: (file: File) => void;
+}>;
+
+export function StudentImportPanel({ importBusy, importReport, chooseFileDisabled, onFile }: StudentImportPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="classroom-import-panel">
-      <h4 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 600 }}>Importar turmas (Excel)</h4>
+      <h4 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 600 }}>Importar alunos (Excel)</h4>
       <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-        Planilha com colunas <strong>nome</strong> e <strong>ano</strong> (5 ou 9). Linhas vazias são ignoradas. As turmas são criadas na
-        escola escolhida no filtro «Escola» (admin/gestor) ou na escola do seu perfil (coordenador).
+        Colunas <strong>nome</strong> e <strong>matricula</strong> (ou matrícula). Os alunos são cadastrados na turma selecionada no filtro
+        «Turma».
       </p>
       <div className="import-toolbar">
-        <button type="button" className="ghost" onClick={() => void downloadClassroomTemplate()}>
+        <button type="button" className="ghost" onClick={() => void downloadStudentTemplate()}>
           Baixar modelo
         </button>
         <input
@@ -51,11 +51,11 @@ export function ClassroomImportPanel({
   );
 }
 
-function ImportReportView({ report }: { report: ClassroomImportReport }) {
+function ImportReportView({ report }: { report: StudentImportReport }) {
   return (
     <div className="import-report" role="status">
       <p style={{ margin: "0.75rem 0 0" }}>
-        <span className="success">{report.ok} turma(s) criada(s).</span>
+        <span className="success">{report.ok} aluno(s) cadastrado(s).</span>
         {report.skipped > 0 ? <span className="muted"> {report.skipped} linha(s) em branco ignorada(s).</span> : null}
       </p>
       {report.errors.length === 0 ? null : (

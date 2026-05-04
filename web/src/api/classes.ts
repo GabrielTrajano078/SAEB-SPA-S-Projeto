@@ -7,10 +7,15 @@ export type Classroom = {
   grade: "5" | "9";
 };
 
-export async function listClassrooms(params?: { schoolId?: string; grade?: "5" | "9" }): Promise<Classroom[]> {
+export async function listClassrooms(params?: {
+  schoolId?: string;
+  grade?: "5" | "9";
+  nameContains?: string;
+}): Promise<Classroom[]> {
   const sp = new URLSearchParams();
   if (params?.schoolId) sp.set("schoolId", params.schoolId);
   if (params?.grade) sp.set("grade", params.grade);
+  if (params?.nameContains?.trim()) sp.set("nameContains", params.nameContains.trim());
   const q = sp.toString();
   return apiFetch<Classroom[]>(`/api/classes${q ? `?${q}` : ""}`);
 }

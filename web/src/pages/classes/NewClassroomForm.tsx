@@ -5,8 +5,6 @@ import { SelectField } from "@/components/SelectField";
 import { Button } from "@/components/ui/Button";
 import type { School } from "@/schemas/school";
 import type { User } from "@/schemas/auth";
-import { ClassroomImportPanel } from "./ClassroomImportPanel";
-import type { ClassroomImportReport } from "./classroom-import-workbook";
 
 export type NewClassroomFormProps = {
   schools: School[];
@@ -20,13 +18,8 @@ export type NewClassroomFormProps = {
   isCoord: boolean;
   user: User;
   formError: string | null;
-  success: string | null;
   createM: UseMutationResult<{ id: string }, unknown, CreateClassroomBody, unknown>;
   onSubmit: (e: FormEvent) => void;
-  importBusy: boolean;
-  importReport: ClassroomImportReport | null;
-  importChooseDisabled: boolean;
-  onImportFile: (file: File) => void;
 };
 
 export function NewClassroomForm({
@@ -41,19 +34,13 @@ export function NewClassroomForm({
   isCoord,
   user,
   formError,
-  success,
   createM,
   onSubmit,
-  importBusy,
-  importReport,
-  importChooseDisabled,
-  onImportFile,
 }: NewClassroomFormProps) {
   const coordBlocked = isCoord && !user.schoolId;
 
   return (
-    <form className="form-grid" style={{ maxWidth: 480, marginTop: "1.25rem" }} onSubmit={onSubmit}>
-      <h3 style={{ margin: 0, fontSize: "1.05rem", gridColumn: "1 / -1" }}>Nova turma</h3>
+    <form className="form-grid" style={{ maxWidth: 480, marginTop: "1rem" }} onSubmit={onSubmit}>
       {needsSchoolPicker ? (
         <SelectField
           label={<span className="field-label">Escola</span>}
@@ -92,23 +79,11 @@ export function NewClassroomForm({
           {formError}
         </p>
       ) : null}
-      {success ? (
-        <p className="success" role="status" style={{ gridColumn: "1 / -1" }}>
-          {success}
-        </p>
-      ) : null}
       <div className="row-actions" style={{ gridColumn: "1 / -1" }}>
         <Button type="submit" variant="primary" disabled={createM.isPending || coordBlocked}>
           {createM.isPending ? "Salvando…" : "Cadastrar turma"}
         </Button>
       </div>
-
-      <ClassroomImportPanel
-        importBusy={importBusy}
-        importReport={importReport}
-        chooseFileDisabled={importChooseDisabled}
-        onFile={onImportFile}
-      />
     </form>
   );
 }

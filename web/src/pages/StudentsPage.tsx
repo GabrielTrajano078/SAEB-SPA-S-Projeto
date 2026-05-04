@@ -1,81 +1,85 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listClassrooms } from "@/api/classes";
 import { createStudent, deleteStudent, listStudents } from "@/api/students";
-import { SelectField } from "@/components/SelectField";
+import { listSchools } from "@/api/schools";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ApiError } from "@/lib/api-client";
-import { downloadStudentTemplate, parseStudentRow, readExcelFirstSheet } from "@/lib/excel-import";
+import { parseStudentRow, readExcelFirstSheet } from "@/lib/excel-import";
+import { StudentsListFilters } from "./students/StudentsListFilters";
+import { StudentImportPanel, type StudentImportReport } from "./students/StudentImportPanel";
 
 export function StudentsPage() {
   const { state } = useAuth();
   const confirm = useConfirm();
   const [sp, setSp] = useSearchParams();
   const classroomId = sp.get("classroomId") ?? "";
+  const setClassroomId = (v: string) => {
+    setSp(v ? { classroomId: v } : {}, { replace: true });
+  };
+
   const qc = useQueryClient();
-  const [fullName, setFullName] = useState("");
-  const [registrationCode, setRegistrationCode] = useState("");
-  const [formErr, setFormErr] = useState<string | null>(null);
+  const [schoolFilter, setSchoolFilter] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [nameContains, setNameContains] = useState("");
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
-  const [importReport, setImportReport] = useState<{
-    ok: number;
-    skipped: number;
-    errors: { line: number; message: string }[];
-  } | null>(null);
-  const studentImportRef = useRef<HTMLInputElement>(null);
+  const [importReport, setImportReport] = useState<StudentImportReport | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   const user = state.status === "authenticated" ? state.user : null;
+  const needsSchoolPicker = user && (user.role === "admin" || user.role === "gestor");
+
+  const schoolsQ = useQuery({
+    queryKey: ["schools"],
+    queryFn: listSchools,
+    enabled: Boolean(needsSchoolPicker && user),
+  });
 
   const classesQ = useQuery({
-    queryKey: ["classes", "students-page"],
-    queryFn: () => listClassrooms(),
-    enabled: !!user,
+    queryKey: ["classes", "students-page", schoolFilter, gradeFilter],
+    queryFn: () =>
+      listClassrooms({
+        ...(schoolFilter ? { schoolId: schoolFilter } : {}),
+        ...(gradeFilter === "5" || gradeFilter === "9" ? { grade: gradeFilter } : {}),
+      }),
+    enabled: Boolean(user),
   });
 
   const selectedClass = useMemo(
-    () => classesQ.data?.find((c) => c._id === classroomId),
+    () => (classroomId ? classesQ.data?.find((c) => c._id === classroomId) : undefined),
     [classesQ.data, classroomId],
   );
 
   const studentsQ = useQuery({
-    queryKey: ["students", classroomId],
-    queryFn: () => listStudents({ classroomId }),
-    enabled: Boolean(classroomId),
+    queryKey: ["students", "list", schoolFilter, gradeFilter, classroomId, nameContains],
+    queryFn: () =>
+      listStudents({
+        ...(schoolFilter ? { schoolId: schoolFilter } : {}),
+        ...(gradeFilter === "5" || gradeFilter === "9" ? { grade: gradeFilter } : {}),
+        ...(classroomId ? { classroomId } : {}),
+        ...(nameContains.trim() ? { fullNameContains: nameContains.trim() } : {}),
+      }),
+    enabled: Boolean(user),
   });
 
-  const createM = useMutation({
-    mutationFn: () => {
-      if (!selectedClass) {
-        throw new Error("Selecione turma.");
-      }
-      return createStudent({
-        schoolId: selectedClass.schoolId,
-        classroomId: selectedClass._id,
-        fullName: fullName.trim(),
-        registrationCode: registrationCode.trim(),
-      });
-    },
-    onSuccess: () => {
-      setFullName("");
-      setRegistrationCode("");
-      setFormErr(null);
-      void qc.invalidateQueries({ queryKey: ["students", classroomId] });
-    },
-    onError: (e: unknown) => {
-      setFormErr(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Erro.");
-    },
-  });
+  const classroomLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of classesQ.data ?? []) {
+      m.set(c._id, `${c.name} (${c.grade}º)`);
+    }
+    return m;
+  }, [classesQ.data]);
 
   const deleteM = useMutation({
     mutationFn: (id: string) => deleteStudent(id),
     onSuccess: () => {
       setDeleteErr(null);
-      void qc.invalidateQueries({ queryKey: ["students", classroomId] });
+      void qc.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (e: unknown) => {
       setDeleteErr(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Não foi possível excluir.");
@@ -84,12 +88,12 @@ export function StudentsPage() {
 
   async function handleStudentExcel(file: File) {
     if (!selectedClass) {
-      setFormErr("Selecione uma turma antes de importar.");
+      setImportError('Selecione uma turma específica no filtro «Turma» para importar (não use «Todos»).');
       return;
     }
     setImportBusy(true);
     setImportReport(null);
-    setFormErr(null);
+    setImportError(null);
     try {
       const rows = await readExcelFirstSheet(file);
       let ok = 0;
@@ -97,7 +101,11 @@ export function StudentsPage() {
       const errors: { line: number; message: string }[] = [];
       for (let i = 0; i < rows.length; i++) {
         const line = i + 2;
-        const parsed = parseStudentRow(rows[i]!);
+        const row = rows[i];
+        if (!row) {
+          continue;
+        }
+        const parsed = parseStudentRow(row);
         if (parsed.kind === "empty") {
           skipped++;
           continue;
@@ -115,18 +123,16 @@ export function StudentsPage() {
           });
           ok++;
         } catch (err) {
-          errors.push({
-            line,
-            message: err instanceof ApiError ? err.message : "Não foi possível salvar esta linha.",
-          });
+          const message = err instanceof ApiError ? err.message : "Não foi possível salvar esta linha.";
+          errors.push({ line, message });
         }
       }
       setImportReport({ ok, skipped, errors });
       if (ok > 0) {
-        void qc.invalidateQueries({ queryKey: ["students", classroomId] });
+        void qc.invalidateQueries({ queryKey: ["students"] });
       }
     } catch {
-      setFormErr(
+      setImportError(
         "Não foi possível ler a planilha. Use .xlsx ou .xls e a primeira aba com colunas nome e matricula.",
       );
     } finally {
@@ -145,116 +151,86 @@ export function StudentsPage() {
     authUser.role === "coordenador" ||
     authUser.role === "professor";
 
+  const classroomOptions = (classesQ.data ?? []).map((c) => ({
+    value: c._id,
+    label: `${c.name} (${c.grade}º)`,
+  }));
+
+  const importChooseDisabled = importBusy || !classroomId || !selectedClass;
+
+  const schools = schoolsQ.data ?? [];
+
+  const showTurmaColumn = !classroomId;
+
   return (
     <div>
       <section className="panel">
-        <h2>Alunos</h2>
-        <SelectField
-          label="Turma"
-          style={{ maxWidth: 400 }}
-          value={classroomId}
-          onValueChange={(v) => {
-            setSp(v ? { classroomId: v } : {});
-          }}
-          options={(classesQ.data ?? []).map((c) => ({ value: c._id, label: `${c.name} (${c.grade}º)` }))}
-          emptyOption={{ label: "Selecione…" }}
+        <div className="section-header">
+          <h2>Alunos</h2>
+          {canCreate ? (
+            <Button asChild variant="primary">
+              <Link to={classroomId ? `/alunos/nova?classroomId=${encodeURIComponent(classroomId)}` : "/alunos/nova"}>
+                Novo aluno
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+        <p className="muted small">
+          Com «Turma» em Todos, a lista segue escola, ano e descrição. Para importar Excel, escolha uma turma específica. Cadastro manual em
+          Novo aluno.
+        </p>
+
+        <StudentsListFilters
+          showSchool={authUser.role === "admin" || authUser.role === "gestor"}
+          schools={schools}
+          schoolId={schoolFilter}
+          onSchoolIdChange={setSchoolFilter}
+          grade={gradeFilter}
+          onGradeChange={setGradeFilter}
+          classroomId={classroomId}
+          onClassroomIdChange={setClassroomId}
+          classroomOptions={classroomOptions}
+          nameContains={nameContains}
+          onNameContainsChange={setNameContains}
         />
+
+        {canCreate ? (
+          <>
+            {importError ? (
+              <p className="error" role="alert" style={{ marginTop: "0.75rem", maxWidth: 480 }}>
+                {importError}
+              </p>
+            ) : null}
+            <StudentImportPanel
+              importBusy={importBusy}
+              importReport={importReport}
+              chooseFileDisabled={importChooseDisabled}
+              onFile={(f) => void handleStudentExcel(f)}
+            />
+          </>
+        ) : null}
       </section>
 
-      {canCreate && classroomId ? (
-        <section className="panel">
-          <h3>Cadastrar aluno</h3>
-          {formErr ? (
-            <p className="error" role="alert">
-              {formErr}
-            </p>
-          ) : null}
-          <div className="form-grid" style={{ maxWidth: 480 }}>
-            <label className="field">
-              Nome completo
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-            </label>
-            <label className="field">
-              Código de matrícula
-              <input value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} required />
-            </label>
-            <Button type="button" variant="primary" disabled={createM.isPending} onClick={() => createM.mutate()}>
-              {createM.isPending ? "Salvando…" : "Adicionar"}
-            </Button>
-          </div>
-
-          <div style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}>
-            <h4 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 600 }}>Importar alunos (Excel)</h4>
-            <p className="muted small" style={{ margin: "0 0 0.75rem" }}>
-              Colunas <strong>nome</strong> e <strong>matricula</strong> (ou matrícula). Os alunos serão cadastrados na turma selecionada acima.
-            </p>
-            <div className="import-toolbar">
-              <button type="button" className="ghost" onClick={() => void downloadStudentTemplate()}>
-                Baixar modelo
-              </button>
-              <input
-                ref={studentImportRef}
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                hidden
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) void handleStudentExcel(f);
-                }}
-              />
-              <Button
-                type="button"
-                variant="primary"
-                disabled={importBusy || !classroomId}
-                onClick={() => studentImportRef.current?.click()}
-              >
-                {importBusy ? "Importando…" : "Escolher planilha…"}
-              </Button>
-            </div>
-            {importReport ? (
-              <div className="import-report" role="status">
-                <p style={{ margin: "0.75rem 0 0" }}>
-                  <span className="success">{importReport.ok} aluno(s) cadastrado(s).</span>
-                  {importReport.skipped > 0 ? (
-                    <span className="muted"> {importReport.skipped} linha(s) em branco ignorada(s).</span>
-                  ) : null}
-                </p>
-                {importReport.errors.length > 0 ? (
-                  <>
-                    <p className="error" style={{ margin: "0.5rem 0 0" }}>
-                      {importReport.errors.length} linha(s) com problema:
-                    </p>
-                    <ul className="small muted" style={{ margin: "0.35rem 0 0" }}>
-                      {importReport.errors.slice(0, 25).map((e) => (
-                        <li key={`${e.line}-${e.message}`}>
-                          Linha {e.line}: {e.message}
-                        </li>
-                      ))}
-                      {importReport.errors.length > 25 ? (
-                        <li>… e mais {importReport.errors.length - 25}.</li>
-                      ) : null}
-                    </ul>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
       <section className="panel">
-        {!classroomId ? <p className="muted">Escolha uma turma.</p> : null}
         {studentsQ.isLoading ? <p className="muted">Carregando…</p> : null}
         {studentsQ.isError ? (
           <p className="error" role="alert">
             {studentsQ.error instanceof ApiError ? studentsQ.error.message : "Erro."}
           </p>
         ) : null}
-        {studentsQ.data && studentsQ.data.length === 0 && classroomId ? (
+        {!studentsQ.isLoading && studentsQ.data?.length === 0 ? (
           <EmptyState
-            title="Nenhum aluno nesta turma"
-            description="Cadastre alunos manualmente ou importe uma planilha Excel."
+            title="Nenhum aluno encontrado"
+            description="Ajuste os filtros ou cadastre alunos em Novo aluno."
+            action={
+              canCreate ? (
+                <Button asChild variant="primary">
+                  <Link to={classroomId ? `/alunos/nova?classroomId=${encodeURIComponent(classroomId)}` : "/alunos/nova"}>
+                    Novo aluno
+                  </Link>
+                </Button>
+              ) : null
+            }
           />
         ) : null}
         {deleteErr ? (
@@ -268,6 +244,7 @@ export function StudentsPage() {
               <thead>
                 <tr>
                   <th>Nome</th>
+                  {showTurmaColumn ? <th>Turma</th> : null}
                   <th>Matrícula</th>
                   {canCreate ? <th className="col-actions">Ações</th> : null}
                 </tr>
@@ -276,6 +253,9 @@ export function StudentsPage() {
                 {studentsQ.data.map((s) => (
                   <tr key={s._id}>
                     <td>{s.fullName}</td>
+                    {showTurmaColumn ? (
+                      <td className="muted small">{classroomLabelById.get(s.classroomId) ?? "—"}</td>
+                    ) : null}
                     <td>{s.registrationCode}</td>
                     {canCreate ? (
                       <td className="col-actions">

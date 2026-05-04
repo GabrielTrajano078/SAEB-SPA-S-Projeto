@@ -8,10 +8,17 @@ export type Student = {
   registrationCode: string;
 };
 
-export async function listStudents(params?: { schoolId?: string; classroomId?: string }): Promise<Student[]> {
+export async function listStudents(params?: {
+  schoolId?: string;
+  classroomId?: string;
+  grade?: "5" | "9";
+  fullNameContains?: string;
+}): Promise<Student[]> {
   const sp = new URLSearchParams();
   if (params?.schoolId) sp.set("schoolId", params.schoolId);
   if (params?.classroomId) sp.set("classroomId", params.classroomId);
+  if (params?.grade) sp.set("grade", params.grade);
+  if (params?.fullNameContains?.trim()) sp.set("fullNameContains", params.fullNameContains.trim());
   const q = sp.toString();
   return apiFetch<Student[]>(`/api/students${q ? `?${q}` : ""}`);
 }

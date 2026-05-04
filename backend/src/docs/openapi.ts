@@ -465,6 +465,7 @@ export const openApiDocument = {
         parameters: [
           { name: "schoolId", in: "query", schema: objectId },
           { name: "grade", in: "query", schema: { type: "string", enum: ["5", "9"] } },
+          { name: "nameContains", in: "query", schema: { type: "string", maxLength: 200 } },
         ],
         responses: {
           200: { description: "Lista de turmas" },
@@ -503,6 +504,8 @@ export const openApiDocument = {
         parameters: [
           { name: "schoolId", in: "query", schema: objectId },
           { name: "classroomId", in: "query", schema: objectId },
+          { name: "grade", in: "query", schema: { type: "string", enum: ["5", "9"] } },
+          { name: "fullNameContains", in: "query", schema: { type: "string", maxLength: 200 } },
         ],
         responses: {
           200: { description: "Lista de alunos" },

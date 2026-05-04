@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { objectIdSchema } from "../common/schemas";
+import { gradeSchema, objectIdSchema } from "../common/schemas";
 
 export const createStudentSchema = z.object({
   schoolId: objectIdSchema,
@@ -11,4 +11,6 @@ export const createStudentSchema = z.object({
 export const listStudentsSchema = z.object({
   schoolId: objectIdSchema.optional(),
   classroomId: objectIdSchema.optional(),
+  grade: gradeSchema.optional(),
+  fullNameContains: z.string().trim().max(200).optional(),
 });

@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { Router } from "express";
+import { escapeRegex } from "../../lib/escape-regex";
 import { canAccessSchool } from "../../lib/access";
 import { requireAuth, requireRole } from "../../middlewares/auth";
 import { ClassroomModel } from "./classroom.model";
@@ -10,9 +11,15 @@ export const classesRouter = Router();
 classesRouter.get("/", requireAuth, async (req, res, next) => {
   try {
     const filters = listClassroomsSchema.parse(req.query);
+    const nameTrim = filters.nameContains?.trim();
     const query: Record<string, unknown> = {
       ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
       ...(filters.grade ? { grade: filters.grade } : {}),
+      ...(nameTrim
+        ? {
+            name: { $regex: escapeRegex(nameTrim), $options: "i" },
+          }
+        : {}),
     };
 
     if (req.user!.role === "professor") {

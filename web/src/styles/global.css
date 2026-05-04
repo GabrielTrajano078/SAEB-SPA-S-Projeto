@@ -1103,6 +1103,19 @@ a.ghost {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
+.form-grid.classes-filters-grid {
+  margin-top: 1rem;
+  max-width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.classroom-import-panel {
+  max-width: 480px;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
 .field--span-2 {
   grid-column: span 2;
 }

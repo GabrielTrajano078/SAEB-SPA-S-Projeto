@@ -10,4 +10,5 @@ export const createClassroomSchema = z.object({
 export const listClassroomsSchema = z.object({
   schoolId: objectIdSchema.optional(),
   grade: gradeSchema.optional(),
+  nameContains: z.string().trim().max(200).optional(),
 });
