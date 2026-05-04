@@ -189,66 +189,6 @@ async function applyListExamsRoleScope(
   return true;
 }
 
-type CreateExamBody = z.infer<typeof createExamSchema>;
-
-async function resolveQuestionIdsFromDescriptorBlueprint(
-  data: CreateExamBody,
-  res: Response,
-): Promise<string[] | null> {
-  const selected: string[] = [];
-  for (const block of data.blueprint ?? []) {
-    const docs = await QuestionModel.find({
-      discipline: data.discipline,
-      grade: data.grade,
-      framework: data.framework,
-      descriptor: block.descriptor,
-      _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
-    })
-      .limit(block.count)
-      .select("_id")
-      .lean();
-
-    if (docs.length < block.count) {
-      res.status(400).json({
-        message: `Banco insuficiente para o descritor ${block.descriptor}.`,
-      });
-      return null;
-    }
-
-    selected.push(...docs.map((doc) => String(doc._id)));
-  }
-  return selected;
-}
-
-async function resolveQuestionIdsFromAxisBlueprint(
-  data: CreateExamBody,
-  res: Response,
-): Promise<string[] | null> {
-  const selected: string[] = [];
-  for (const block of data.blueprintByAxis ?? []) {
-    const docs = await QuestionModel.find({
-      discipline: data.discipline,
-      grade: data.grade,
-      framework: data.framework,
-      axis: block.axis,
-      _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
-    })
-      .limit(block.count)
-      .select("_id")
-      .lean();
-
-    if (docs.length < block.count) {
-      res.status(400).json({
-        message: `Banco insuficiente para o eixo ${block.axis}. Cadastre questoes com esse eixo ou ajuste o simulado.`,
-      });
-      return null;
-    }
-
-    selected.push(...docs.map((doc) => String(doc._id)));
-  }
-  return selected;
-}
-
 examsRouter.get("/blueprint/simulado", requireAuth, async (req, res, next) => {
   try {
     const q = simulatedBlueprintQuerySchema.parse(req.query);
@@ -409,21 +349,56 @@ examsRouter.post(
 
       const sourceType = data.sourceType ?? "QUESTION_BANK";
       let questionIds: string[] = data.questionIds ? [...data.questionIds] : [];
+      const selected: string[] = [];
 
       if (sourceType === "QUESTION_BANK" && data.blueprint?.length) {
-        const fromDescriptor = await resolveQuestionIdsFromDescriptorBlueprint(data, res);
-        if (fromDescriptor === null) {
-          return;
+        for (const block of data.blueprint) {
+          const docs = await QuestionModel.find({
+            discipline: data.discipline,
+            grade: data.grade,
+            framework: data.framework,
+            descriptor: block.descriptor,
+            _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
+          })
+            .limit(block.count)
+            .select("_id")
+            .lean();
+
+          if (docs.length < block.count) {
+            res.status(400).json({
+              message: `Banco insuficiente para o descritor ${block.descriptor}.`,
+            });
+            return;
+          }
+
+          selected.push(...docs.map((doc) => String(doc._id)));
         }
-        questionIds = fromDescriptor;
+        questionIds = selected;
       }
 
       if (sourceType === "QUESTION_BANK" && data.blueprintByAxis?.length) {
-        const fromAxis = await resolveQuestionIdsFromAxisBlueprint(data, res);
-        if (fromAxis === null) {
-          return;
+        for (const block of data.blueprintByAxis) {
+          const docs = await QuestionModel.find({
+            discipline: data.discipline,
+            grade: data.grade,
+            framework: data.framework,
+            axis: block.axis,
+            _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
+          })
+            .limit(block.count)
+            .select("_id")
+            .lean();
+
+          if (docs.length < block.count) {
+            res.status(400).json({
+              message: `Banco insuficiente para o eixo ${block.axis}. Cadastre questoes com esse eixo ou ajuste o simulado.`,
+            });
+            return;
+          }
+
+          selected.push(...docs.map((doc) => String(doc._id)));
         }
-        questionIds = fromAxis;
+        questionIds = selected;
       }
 
       const questions =
