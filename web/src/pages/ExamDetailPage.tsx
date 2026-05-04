@@ -1,10 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { fetchExam, generateAnswerSheets, listExamAnswerSheets, publishAnswerKey } from "@/api/exams";
+import { listClassrooms } from "@/api/classes";
+import {
+  fetchExam,
+  generateAnswerSheets,
+  listExamAnswerSheets,
+  publishAnswerKey,
+  uploadExamOriginalPdf,
+} from "@/api/exams";
 import { processAnswerSheetScan, uploadAnswerSheetScan } from "@/api/results";
-import { ApiError } from "@/lib/api-client";
+import { BulkScanUpload } from "@/components/BulkScanUpload";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Stepper } from "@/components/ui/Stepper";
+import { copy } from "@/lib/copy";
 import { disciplineLabel } from "@/lib/discipline";
+import { buildExamProgressSteps } from "@/lib/exam-progress";
+import { formatApiError } from "@/lib/format-api-error";
+import { pluralize } from "@/lib/pluralize";
 
 export function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +39,17 @@ export function ExamDetailPage() {
     enabled: Boolean(id) && Boolean(examQ.data),
   });
 
+  const classesQ = useQuery({
+    queryKey: ["classes", "exam-detail", examQ.data?.classroomId],
+    queryFn: () => listClassrooms(),
+    enabled: Boolean(examQ.data?.classroomId),
+  });
+
+  const classroomRow = useMemo(
+    () => classesQ.data?.find((c) => c._id === examQ.data?.classroomId),
+    [classesQ.data, examQ.data?.classroomId],
+  );
+
   const publishM = useMutation({
     mutationFn: () => publishAnswerKey(id!),
     onSuccess: () => {
@@ -32,7 +58,22 @@ export function ExamDetailPage() {
       void qc.invalidateQueries({ queryKey: ["exam", id] });
     },
     onError: (e: unknown) => {
-      setErr(e instanceof ApiError ? e.message : "Falha ao publicar gabarito.");
+      setErr(formatApiError(e, "Não foi possível publicar o gabarito."));
+      setMsg(null);
+    },
+  });
+
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const pdfM = useMutation({
+    mutationFn: (file: File) => uploadExamOriginalPdf(id!, file),
+    onSuccess: () => {
+      setMsg(copy.examPdfUploaded);
+      setErr(null);
+      void qc.invalidateQueries({ queryKey: ["exam", id] });
+    },
+    onError: (e: unknown) => {
+      setErr(formatApiError(e, "Não foi possível enviar o PDF."));
       setMsg(null);
     },
   });
@@ -40,7 +81,9 @@ export function ExamDetailPage() {
   const genM = useMutation({
     mutationFn: () => generateAnswerSheets(id!),
     onSuccess: (data) => {
-      setMsg(`PDF com ${data.totalSheets} cartão(ões) gerado.`);
+      setMsg(
+        `PDF com ${pluralize(data.totalSheets, "cartão-resposta gerado", "cartões-resposta gerados")}.`,
+      );
       setErr(null);
       void qc.invalidateQueries({ queryKey: ["exam-sheets", id] });
       if (data.url) {
@@ -48,27 +91,37 @@ export function ExamDetailPage() {
       }
     },
     onError: (e: unknown) => {
-      setErr(e instanceof ApiError ? e.message : "Falha ao gerar cartões.");
+      setErr(formatApiError(e, "Não foi possível gerar os cartões-resposta."));
       setMsg(null);
     },
   });
+
+  const exam = examQ.data;
+
+  const progressSteps = useMemo(
+    () =>
+      id && exam ? buildExamProgressSteps({ examStatus: exam.status, sheets: sheetsQ.data ?? [] }) : [],
+    [id, exam, sheetsQ.data],
+  );
 
   if (!id) {
     return <p className="error">Prova inválida.</p>;
   }
 
-  const exam = examQ.data;
+  const scrollToFlow = (anchorId: string) => {
+    document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div>
-      <section className="panel">
+      <section className="panel" id="exam-flow-root">
         <p className="muted small">
           <Link to="/provas">← Provas</Link>
         </p>
         {examQ.isLoading ? <p className="muted">Carregando…</p> : null}
-        {examQ.isError ? (
+            {examQ.isError ? (
           <p className="error" role="alert">
-            {examQ.error instanceof ApiError ? examQ.error.message : "Erro ao carregar prova."}
+            {formatApiError(examQ.error, "Não foi possível carregar esta prova.")}
           </p>
         ) : null}
         {exam ? (
@@ -76,11 +129,13 @@ export function ExamDetailPage() {
             <h2>{exam.title}</h2>
             <p className="muted">
               Código <span className="badge">{exam.examCode}</span> · {disciplineLabel(exam.discipline)} {exam.grade}º ·{" "}
-              {exam.framework} ·{" "}
-              {exam.examType ?? "—"} · Status {exam.status ?? "—"}
+              {exam.framework} · {exam.examType ?? "—"} · <StatusBadge status={exam.status} />
             </p>
             <p className="small">
-              Turma: <Link to={`/turma/${exam.classroomId}`}>{exam.classroomId.slice(-6)}</Link>
+              Turma:{" "}
+              <Link to={`/turma/${exam.classroomId}`}>
+                {classroomRow ? `${classroomRow.name} (${classroomRow.grade}º)` : "Abrir painel da turma"}
+              </Link>
             </p>
             {msg ? <p className="success">{msg}</p> : null}
             {err ? (
@@ -89,24 +144,50 @@ export function ExamDetailPage() {
               </p>
             ) : null}
 
+            {progressSteps.length ? (
+              <Stepper steps={progressSteps} onStepClick={(aid) => scrollToFlow(aid)} />
+            ) : null}
+
             {(exam.sourceType ?? "QUESTION_BANK") === "PDF_IMPORT" ? (
-              <p className="muted">
-                Prova importada por PDF: use o Swagger para enviar o arquivo original e configurar gabarito manualmente se
-                necessário.
-              </p>
+              <div id="exam-flow-key">
+                <p className="muted">{copy.pdfImportHint}</p>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) {
+                      pdfM.mutate(file);
+                    }
+                  }}
+                />
+                <div className="row-actions">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={pdfM.isPending}
+                    onClick={() => pdfInputRef.current?.click()}
+                  >
+                    {pdfM.isPending ? "Enviando…" : "Selecionar PDF da prova"}
+                  </Button>
+                </div>
+              </div>
             ) : (
               <>
-                <div className="row-actions">
-                  <button type="button" className="primary" disabled={publishM.isPending} onClick={() => publishM.mutate()}>
+                <div className="row-actions" id="exam-flow-key">
+                  <Button variant="primary" disabled={publishM.isPending} onClick={() => publishM.mutate()}>
                     {publishM.isPending ? "Publicando…" : "Publicar gabarito oficial"}
-                  </button>
-                  <button type="button" className="ghost" disabled={genM.isPending} onClick={() => genM.mutate()}>
+                  </Button>
+                  <Button variant="ghost" disabled={genM.isPending} onClick={() => genM.mutate()}>
                     {genM.isPending ? "Gerando…" : "Gerar PDF dos cartões-resposta"}
-                  </button>
+                  </Button>
                 </div>
                 <p className="muted small">
                   Publique o gabarito antes da correção. Gere os cartões para cada aluno da turma; depois envie foto/scan e
-                  processe o OMR.
+                  envie a leitura automática dos cartões.
                 </p>
               </>
             )}
@@ -127,23 +208,53 @@ export function ExamDetailPage() {
                       <tr key={q.order}>
                         <td>{q.order}</td>
                         <td>{q.descriptor ?? "—"}</td>
-                        <td style={{ maxWidth: 280 }}>{q.prompt?.slice(0, 80) ?? (q.missing ? "—" : "")}…</td>
+                        <td className="question-preview-cell-limit">
+                          {q.prompt?.slice(0, 80) ?? (q.missing ? "—" : "")}…
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : null}
+
+            {(exam.sourceType ?? "QUESTION_BANK") === "PDF_IMPORT" ? (
+              <>
+                <div className="exam-flow-pdf-anchors muted small">
+                  <p id="exam-flow-sheets" tabIndex={-1}>
+                    Cartões-resposta em PDF não se aplicam a esta prova importada.
+                  </p>
+                  <p id="exam-flow-upload" tabIndex={-1}>
+                    Use o envio do PDF original na seção acima.
+                  </p>
+                </div>
+                <p id="exam-flow-results" className="muted small" tabIndex={-1}>
+                  Resultados consolidados e ranking por turma ficam disponíveis após leituras e encerramento da prova.
+                </p>
+              </>
+            ) : null}
           </>
         ) : null}
       </section>
 
       {exam && (exam.sourceType ?? "QUESTION_BANK") !== "PDF_IMPORT" ? (
-        <section className="panel">
+        <section className="panel" id="exam-flow-sheets">
           <h3>Cartões-resposta</h3>
+          <div id="exam-flow-upload">
+            <BulkScanUpload
+              sheets={sheetsQ.data ?? []}
+              onDone={() => {
+                void qc.invalidateQueries({ queryKey: ["exam-sheets", id] });
+                void qc.invalidateQueries({ queryKey: ["exam", id] });
+              }}
+            />
+          </div>
           {sheetsQ.isLoading ? <p className="muted">Carregando cartões…</p> : null}
           {sheetsQ.data && sheetsQ.data.length === 0 ? (
-            <p className="muted">Nenhum cartão gerado ainda. Use &quot;Gerar PDF dos cartões-resposta&quot;.</p>
+            <EmptyState
+              title="Nenhum cartão-resposta gerado"
+              description='Use o botão "Gerar PDF dos cartões-resposta" acima para criar os cartões da turma.'
+            />
           ) : null}
           {sheetsQ.data && sheetsQ.data.length > 0 ? (
             <div className="table-wrap">
@@ -153,7 +264,7 @@ export function ExamDetailPage() {
                     <th>Aluno</th>
                     <th>Código folha</th>
                     <th>Status</th>
-                    <th>OMR</th>
+                    <th>Leitura</th>
                     <th>Enviar imagem</th>
                   </tr>
                 </thead>
@@ -179,6 +290,9 @@ export function ExamDetailPage() {
               </table>
             </div>
           ) : null}
+          <p id="exam-flow-results" className="muted small" tabIndex={-1}>
+            Resultados consolidados e ranking por turma ficam disponíveis após leituras e encerramento da prova.
+          </p>
         </section>
       ) : null}
     </div>
@@ -209,7 +323,7 @@ function ScanCell({ answerSheetId, onDone }: { answerSheetId: string; onDone: ()
             setLocalOk(`${proc.percentage}% · ${proc.correct}/${proc.totalEffective}`);
             onDone();
           } catch (err) {
-            setLocalErr(err instanceof ApiError ? err.message : "Falha no upload/OMR.");
+            setLocalErr(formatApiError(err, "Não foi possível enviar ou processar a imagem do cartão."));
           } finally {
             setBusy(false);
           }

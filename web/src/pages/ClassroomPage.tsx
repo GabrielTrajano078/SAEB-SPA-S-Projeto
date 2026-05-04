@@ -1,17 +1,45 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { listClassrooms } from "@/api/classes";
 import { listExams } from "@/api/exams";
+import { listSchools } from "@/api/schools";
 import { fetchClassroomHeatmap, fetchClassroomRanking, fetchClassroomReport } from "@/api/results";
+import { SelectField } from "@/components/SelectField";
+import { useAuth } from "@/auth/useAuth";
 import { ApiError } from "@/lib/api-client";
 
 type Tab = "ranking" | "heatmap" | "report";
 
 export function ClassroomPage() {
+  const { state } = useAuth();
   const { classroomId } = useParams<{ classroomId: string }>();
   const [sp, setSp] = useSearchParams();
   const examId = sp.get("examId") ?? "";
   const [tab, setTab] = useState<Tab>("ranking");
+
+  const classesQ = useQuery({
+    queryKey: ["classes", "classroom-page"],
+    queryFn: () => listClassrooms(),
+    enabled: Boolean(classroomId) && state.status === "authenticated",
+  });
+  const schoolsQ = useQuery({
+    queryKey: ["schools"],
+    queryFn: listSchools,
+    enabled:
+      Boolean(classroomId) &&
+      state.status === "authenticated" &&
+      (state.user.role === "admin" || state.user.role === "gestor"),
+  });
+
+  const classroomMeta = useMemo(() => {
+    const c = classesQ.data?.find((x) => x._id === classroomId);
+    if (!c) {
+      return null;
+    }
+    const school = schoolsQ.data?.find((s) => s._id === c.schoolId);
+    return { classroom: c, schoolName: school?.name };
+  }, [classesQ.data, classroomId, schoolsQ.data]);
 
   const examsQ = useQuery({
     queryKey: ["exams", "classroom", classroomId],
@@ -47,24 +75,25 @@ export function ClassroomPage() {
         <p className="muted small">
           <Link to="/turmas">← Turmas</Link>
         </p>
-        <h2>Turma {classroomId.slice(-8)}</h2>
-        <label className="field" style={{ maxWidth: 400 }}>
-          Filtrar por prova (opcional)
-          <select
-            value={examId}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSp(v ? { examId: v } : {});
-            }}
-          >
-            <option value="">Todas as provas com cartões nesta turma</option>
-            {examsQ.data?.map((e) => (
-              <option key={e._id} value={e._id}>
-                {e.title} ({e.examCode})
-              </option>
-            ))}
-          </select>
-        </label>
+        <h2>
+          {classroomMeta
+            ? `${classroomMeta.classroom.name} (${classroomMeta.classroom.grade}º)${
+                classroomMeta.schoolName ? ` · ${classroomMeta.schoolName}` : ""
+              }`
+            : classesQ.isLoading
+              ? "Turma"
+              : "Turma"}
+        </h2>
+        <SelectField
+          label="Filtrar por prova (opcional)"
+          style={{ maxWidth: 400 }}
+          value={examId}
+          onValueChange={(v) => {
+            setSp(v ? { examId: v } : {});
+          }}
+          options={(examsQ.data ?? []).map((e) => ({ value: e._id, label: `${e.title} (${e.examCode})` }))}
+          emptyOption={{ label: "Todas as provas com cartões nesta turma" }}
+        />
       </section>
 
       <section className="panel">
@@ -97,7 +126,6 @@ export function ClassroomPage() {
                       <th>Aluno</th>
                       <th>Acertos</th>
                       <th>%</th>
-                      <th>Cartão</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -108,7 +136,6 @@ export function ClassroomPage() {
                           {r.correct}/{r.totalEffective}
                         </td>
                         <td>{r.percentage}%</td>
-                        <td className="small muted">{r.answerSheetId.slice(-6)}</td>
                       </tr>
                     ))}
                   </tbody>

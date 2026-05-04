@@ -23,7 +23,7 @@ export function LoginPage() {
   }
 
   if (state.status === "authenticated") {
-    return <Navigate to="/questoes" replace />;
+    return <Navigate to="/" replace />;
   }
 
   async function handleSubmit(e: React.FormEvent) {

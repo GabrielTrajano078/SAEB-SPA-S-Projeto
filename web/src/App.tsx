@@ -2,9 +2,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { AppLayout } from "@/layout/AppLayout";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { BootstrapPage } from "@/pages/BootstrapPage";
 import { ClassroomPage } from "@/pages/ClassroomPage";
 import { ClassesPage } from "@/pages/ClassesPage";
+import { DashboardHomePage } from "@/pages/DashboardHomePage";
 import { ExamDetailPage } from "@/pages/ExamDetailPage";
 import { ExamNewPage } from "@/pages/ExamNewPage";
 import { ExamsPage } from "@/pages/ExamsPage";
@@ -23,17 +25,18 @@ export default function App() {
     <QueryProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/bootstrap" element={<BootstrapPage />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/questoes" replace />} />
+          <ConfirmProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/bootstrap" element={<BootstrapPage />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<DashboardHomePage />} />
               <Route path="questoes" element={<QuestionsPage />} />
               <Route
                 path="questoes/nova"
@@ -66,9 +69,10 @@ export default function App() {
                   </RoleRoute>
                 }
               />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </ConfirmProvider>
         </BrowserRouter>
       </AuthProvider>
     </QueryProvider>

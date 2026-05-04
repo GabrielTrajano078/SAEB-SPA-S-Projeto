@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listSchools } from "@/api/schools";
 import { fetchSchoolSummary } from "@/api/results";
+import { SelectField } from "@/components/SelectField";
 import { ApiError } from "@/lib/api-client";
 
 export function SchoolSummaryPage() {
@@ -44,23 +45,16 @@ export function SchoolSummaryPage() {
       <section className="panel">
         <h2>Resumo da escola</h2>
         {user.role === "admin" || user.role === "gestor" ? (
-          <label className="field" style={{ maxWidth: 400 }}>
-            Escola
-            <select
-              value={querySchoolId}
-              onChange={(e) => {
-                const v = e.target.value;
-                setSp(v ? { schoolId: v } : {});
-              }}
-            >
-              <option value="">Selecione…</option>
-              {schoolsQ.data?.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Escola"
+            style={{ maxWidth: 400 }}
+            value={querySchoolId}
+            onValueChange={(v) => {
+              setSp(v ? { schoolId: v } : {});
+            }}
+            options={(schoolsQ.data ?? []).map((s) => ({ value: s._id, label: s.name }))}
+            emptyOption={{ label: "Selecione…" }}
+          />
         ) : (
           <p className="muted small">Escola vinculada ao seu usuário.</p>
         )}

@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { createSchool, listSchools } from "@/api/schools";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ApiError } from "@/lib/api-client";
 import { useState } from "react";
 
@@ -114,9 +116,9 @@ export function SchoolsPage() {
             </p>
           ) : null}
           <div className="row-actions">
-            <button type="submit" className="primary" disabled={createM.isPending}>
+            <Button type="submit" variant="primary" disabled={createM.isPending}>
               {createM.isPending ? "Salvando…" : "Cadastrar escola"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>
@@ -142,7 +144,12 @@ export function SchoolsPage() {
             ))}
           </ul>
         ) : (
-          !q.isLoading && <p className="muted">Nenhuma escola ainda.</p>
+          !q.isLoading && (
+            <EmptyState
+              title="Nenhuma escola cadastrada"
+              description="Cadastre a primeira escola do município para vincular turmas e provas."
+            />
+          )
         )}
       </section>
     </div>

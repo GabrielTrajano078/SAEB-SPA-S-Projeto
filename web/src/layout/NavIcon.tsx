@@ -13,6 +13,13 @@ const stroke = {
 export function NavIcon({ to }: { to: string }) {
   const cn = "nav-icon";
   switch (to) {
+    case "/":
+      return (
+        <svg className={cn} {...stroke} aria-hidden>
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
     case "/provas":
       return (
         <svg className={cn} {...stroke} aria-hidden>

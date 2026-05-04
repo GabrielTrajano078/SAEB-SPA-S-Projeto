@@ -1,0 +1,126 @@
+import type { FormEvent } from "react";
+import type { UseMutationResult } from "@tanstack/react-query";
+import type { CreateClassroomBody } from "@/api/classes";
+import { SelectField } from "@/components/SelectField";
+import { Button } from "@/components/ui/Button";
+import type { School } from "@/schemas/school";
+import type { User } from "@/schemas/auth";
+import { ClassroomImportPanel } from "./ClassroomImportPanel";
+import type { ClassroomImportReport } from "./classroom-import-workbook";
+
+export type NewClassroomFormProps = {
+  schools: School[];
+  schoolId: string;
+  onSchoolIdChange: (v: string) => void;
+  name: string;
+  onNameChange: (v: string) => void;
+  grade: "5" | "9";
+  onGradeChange: (v: "5" | "9") => void;
+  needsSchoolPicker: boolean;
+  isCoord: boolean;
+  user: User;
+  formError: string | null;
+  success: string | null;
+  createM: UseMutationResult<{ id: string }, unknown, CreateClassroomBody, unknown>;
+  onSubmit: (e: FormEvent) => void;
+  importBusy: boolean;
+  importReport: ClassroomImportReport | null;
+  importChooseDisabled: boolean;
+  onImportFile: (file: File) => void;
+};
+
+export function NewClassroomForm({
+  schools,
+  schoolId,
+  onSchoolIdChange,
+  name,
+  onNameChange,
+  grade,
+  onGradeChange,
+  needsSchoolPicker,
+  isCoord,
+  user,
+  formError,
+  success,
+  createM,
+  onSubmit,
+  importBusy,
+  importReport,
+  importChooseDisabled,
+  onImportFile,
+}: NewClassroomFormProps) {
+  const coordBlocked = isCoord && !user.schoolId;
+
+  return (
+    <form className="form-grid" style={{ maxWidth: 480, marginTop: "1.25rem" }} onSubmit={onSubmit}>
+      <h3 style={{ margin: 0, fontSize: "1.05rem", gridColumn: "1 / -1" }}>Nova turma</h3>
+      {needsSchoolPicker ? (
+        <SelectField
+          label={<span className="field-label">Escola</span>}
+          style={{ gridColumn: "1 / -1" }}
+          value={schoolId}
+          onValueChange={onSchoolIdChange}
+          options={schools.map((s) => ({ value: s._id, label: s.name }))}
+          emptyOption={{ label: "Selecione…" }}
+          required
+        />
+      ) : null}
+      {isCoord ? <CoordSchoolHint user={user} /> : null}
+
+      <label className="field" style={{ gridColumn: "1 / -1" }}>
+        <span className="field-label">Nome da turma</span>
+        <input
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          required
+          placeholder="Ex.: 5º A Manhã"
+          disabled={coordBlocked}
+        />
+      </label>
+      <SelectField
+        label={<span className="field-label">Ano</span>}
+        value={grade}
+        onValueChange={(v) => onGradeChange(v as "5" | "9")}
+        options={[
+          { value: "5", label: "5º ano" },
+          { value: "9", label: "9º ano" },
+        ]}
+        disabled={coordBlocked}
+      />
+      {formError ? (
+        <p className="error" role="alert" style={{ gridColumn: "1 / -1" }}>
+          {formError}
+        </p>
+      ) : null}
+      {success ? (
+        <p className="success" role="status" style={{ gridColumn: "1 / -1" }}>
+          {success}
+        </p>
+      ) : null}
+      <div className="row-actions" style={{ gridColumn: "1 / -1" }}>
+        <Button type="submit" variant="primary" disabled={createM.isPending || coordBlocked}>
+          {createM.isPending ? "Salvando…" : "Cadastrar turma"}
+        </Button>
+      </div>
+
+      <ClassroomImportPanel
+        importBusy={importBusy}
+        importReport={importReport}
+        chooseFileDisabled={importChooseDisabled}
+        onFile={onImportFile}
+      />
+    </form>
+  );
+}
+
+function CoordSchoolHint({ user }: { user: User }) {
+  return (
+    <p className="muted small" style={{ margin: 0, gridColumn: "1 / -1" }}>
+      {user.schoolId ? (
+        <>Turma será criada na escola vinculada ao seu perfil.</>
+      ) : (
+        <strong className="error">Seu usuário não tem escola vinculada — peça um administrador para vincular a escola ao seu perfil.</strong>
+      )}
+    </p>
+  );
+}

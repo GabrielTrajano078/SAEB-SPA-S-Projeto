@@ -1,0 +1,79 @@
+import { Link } from "react-router-dom";
+import type { Classroom } from "@/api/classes";
+import { ApiError } from "@/lib/api-client";
+import { EmptyState } from "@/components/ui/EmptyState";
+import type { User } from "@/schemas/auth";
+
+export type RegisteredClassesTableProps = {
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  classrooms: Classroom[] | undefined;
+  schoolNameById: Map<string, string>;
+  user: User;
+  canCreate: boolean;
+};
+
+export function RegisteredClassesTable({
+  isLoading,
+  isError,
+  error,
+  classrooms,
+  schoolNameById,
+  user,
+  canCreate,
+}: RegisteredClassesTableProps) {
+  if (isLoading) {
+    return <p className="muted">Carregando…</p>;
+  }
+  if (isError) {
+    return (
+      <p className="error" role="alert">
+        {error instanceof ApiError ? error.message : "Erro."}
+      </p>
+    );
+  }
+  if (classrooms === undefined) {
+    return null;
+  }
+  if (classrooms.length === 0) {
+    return (
+      <EmptyState
+        title="Nenhuma turma cadastrada"
+        description="Cadastre uma turma ou importe uma planilha para começar."
+        action={canCreate ? <span className="muted small">Use o formulário «Nova turma» acima.</span> : null}
+      />
+    );
+  }
+  return (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Ano</th>
+            <th>Escola</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {classrooms.map((c) => (
+            <tr key={c._id}>
+              <td>{c.name}</td>
+              <td>{c.grade}º</td>
+              <td className="small">
+                {schoolNameById.get(c.schoolId) ??
+                  (user.role === "coordenador" || user.role === "professor" ? "Escola do perfil" : "—")}
+              </td>
+              <td>
+                <Link to={`/turma/${c._id}`}>Painel</Link>
+                {" · "}
+                <Link to={`/alunos?classroomId=${c._id}`}>Alunos</Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

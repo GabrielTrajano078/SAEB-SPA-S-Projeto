@@ -13,25 +13,38 @@ function roleLabel(role: User["role"]): string {
   return map[role];
 }
 
-function navForRole(role: User["role"]) {
-  const base = [
-    { to: "/provas", label: "Avaliação" },
-    { to: "/questoes", label: "Banco de questões" },
-    { to: "/turmas", label: "Turmas" },
-    { to: "/alunos", label: "Alunos" },
-  ];
-  const extra: { to: string; label: string }[] = [];
-  if (role === "admin") {
-    extra.push({ to: "/escolas", label: "Escolas" });
-  }
-  if (role === "gestor") {
-    extra.push({ to: "/escolas", label: "Escolas" });
-    extra.push({ to: "/municipio", label: "Painel município" });
-  }
-  if (role === "coordenador" || role === "professor" || role === "admin" || role === "gestor") {
-    extra.push({ to: "/escola/resumo", label: "Resumo da escola" });
-  }
-  return [...base, ...extra];
+type NavItem = { to: string; label: string; roles?: User["role"][] };
+type NavGroup = { label: string; roles?: User["role"][]; items: NavItem[] };
+
+const NAV_GROUPS: NavGroup[] = [
+  { label: "Início", items: [{ to: "/", label: "Painel" }] },
+  { label: "Operação", items: [{ to: "/provas", label: "Provas" }] },
+  {
+    label: "Pedagógico",
+    items: [
+      { to: "/questoes", label: "Banco de questões" },
+      { to: "/turmas", label: "Turmas" },
+      { to: "/alunos", label: "Alunos" },
+    ],
+  },
+  {
+    label: "Análise",
+    items: [{ to: "/escola/resumo", label: "Resumo da escola" }],
+  },
+  {
+    label: "Cadastros",
+    roles: ["admin", "gestor"],
+    items: [{ to: "/escolas", label: "Escolas" }],
+  },
+];
+
+function navGroupsForRole(role: User["role"]): NavGroup[] {
+  return NAV_GROUPS.filter((g) => !g.roles || g.roles.includes(role))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => !it.roles || it.roles.includes(role)),
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 export function AppLayout() {
@@ -40,7 +53,7 @@ export function AppLayout() {
     return null;
   }
   const { user } = state;
-  const links = navForRole(user.role);
+  const groups = navGroupsForRole(user.role);
 
   return (
     <div className="app-shell">
@@ -55,19 +68,24 @@ export function AppLayout() {
             <span className="sidebar-tagline">Matriz nacional · LP e MAT (5º e 9º)</span>
           </div>
         </div>
-        <div className="sidebar-section-label">Menu</div>
-        <nav className="sidebar-nav" aria-label="Principal">
-          {links.map((l) => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              className={({ isActive }) => (isActive ? "nav-link nav-link-side active" : "nav-link nav-link-side")}
-            >
-              <NavIcon to={l.to} />
-              <span className="nav-link-label">{l.label}</span>
-            </NavLink>
-          ))}
-        </nav>
+        {groups.map((group) => (
+          <div key={group.label} className="sidebar-nav-group">
+            <div className="sidebar-section-label">{group.label}</div>
+            <nav className="sidebar-nav" aria-label={group.label}>
+              {group.items.map((l) => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  end={l.to === "/"}
+                  className={({ isActive }) => (isActive ? "nav-link nav-link-side active" : "nav-link nav-link-side")}
+                >
+                  <NavIcon to={l.to} />
+                  <span className="nav-link-label">{l.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        ))}
         <div className="sidebar-footer">
           <div className="sidebar-user-card" aria-label="Sessão atual">
             <div className="sidebar-user-avatar" aria-hidden="true">

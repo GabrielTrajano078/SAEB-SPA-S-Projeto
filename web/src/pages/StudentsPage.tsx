@@ -4,11 +4,16 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listClassrooms } from "@/api/classes";
 import { createStudent, deleteStudent, listStudents } from "@/api/students";
+import { SelectField } from "@/components/SelectField";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ApiError } from "@/lib/api-client";
 import { downloadStudentTemplate, parseStudentRow, readExcelFirstSheet } from "@/lib/excel-import";
 
 export function StudentsPage() {
   const { state } = useAuth();
+  const confirm = useConfirm();
   const [sp, setSp] = useSearchParams();
   const classroomId = sp.get("classroomId") ?? "";
   const qc = useQueryClient();
@@ -144,22 +149,16 @@ export function StudentsPage() {
     <div>
       <section className="panel">
         <h2>Alunos</h2>
-        <label className="field" style={{ maxWidth: 400 }}>
-          Turma
-          <select
-            value={classroomId}
-            onChange={(e) => {
-              setSp(e.target.value ? { classroomId: e.target.value } : {});
-            }}
-          >
-            <option value="">Selecione…</option>
-            {classesQ.data?.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name} ({c.grade}º)
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Turma"
+          style={{ maxWidth: 400 }}
+          value={classroomId}
+          onValueChange={(v) => {
+            setSp(v ? { classroomId: v } : {});
+          }}
+          options={(classesQ.data ?? []).map((c) => ({ value: c._id, label: `${c.name} (${c.grade}º)` }))}
+          emptyOption={{ label: "Selecione…" }}
+        />
       </section>
 
       {canCreate && classroomId ? (
@@ -179,9 +178,9 @@ export function StudentsPage() {
               Código de matrícula
               <input value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} required />
             </label>
-            <button type="button" className="primary" disabled={createM.isPending} onClick={() => createM.mutate()}>
+            <Button type="button" variant="primary" disabled={createM.isPending} onClick={() => createM.mutate()}>
               {createM.isPending ? "Salvando…" : "Adicionar"}
-            </button>
+            </Button>
           </div>
 
           <div style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}>
@@ -204,14 +203,14 @@ export function StudentsPage() {
                   if (f) void handleStudentExcel(f);
                 }}
               />
-              <button
+              <Button
                 type="button"
-                className="primary"
+                variant="primary"
                 disabled={importBusy || !classroomId}
                 onClick={() => studentImportRef.current?.click()}
               >
                 {importBusy ? "Importando…" : "Escolher planilha…"}
-              </button>
+              </Button>
             </div>
             {importReport ? (
               <div className="import-report" role="status">
@@ -252,7 +251,12 @@ export function StudentsPage() {
             {studentsQ.error instanceof ApiError ? studentsQ.error.message : "Erro."}
           </p>
         ) : null}
-        {studentsQ.data && studentsQ.data.length === 0 && classroomId ? <p className="muted">Nenhum aluno nesta turma.</p> : null}
+        {studentsQ.data && studentsQ.data.length === 0 && classroomId ? (
+          <EmptyState
+            title="Nenhum aluno nesta turma"
+            description="Cadastre alunos manualmente ou importe uma planilha Excel."
+          />
+        ) : null}
         {deleteErr ? (
           <p className="error" role="alert">
             {deleteErr}
@@ -279,14 +283,15 @@ export function StudentsPage() {
                           type="button"
                           className="btn-danger-text"
                           disabled={deleteM.isPending}
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Excluir o aluno "${s.fullName}"? Esta ação não pode ser desfeita (inclui cartões e resultados vinculados).`,
-                              )
-                            ) {
-                              return;
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: "Excluir aluno",
+                              description: `Excluir "${s.fullName}"? Esta ação não pode ser desfeita (inclui cartões e resultados vinculados).`,
+                              variant: "danger",
+                              confirmLabel: "Excluir",
+                              cancelLabel: "Cancelar",
+                            });
+                            if (!ok) return;
                             deleteM.mutate(s._id);
                           }}
                         >

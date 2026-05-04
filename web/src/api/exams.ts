@@ -124,3 +124,9 @@ export type AnswerSheetRow = {
 export async function listExamAnswerSheets(examId: string): Promise<AnswerSheetRow[]> {
   return apiFetch(`/api/exams/${examId}/answer-sheets`);
 }
+
+export async function uploadExamOriginalPdf(examId: string, file: File): Promise<{ id: string; url: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch(`/api/exams/${examId}/files/original`, { method: "POST", body: fd });
+}

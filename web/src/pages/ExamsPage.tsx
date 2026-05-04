@@ -2,8 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { listExams } from "@/api/exams";
-import { ApiError } from "@/lib/api-client";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { copy } from "@/lib/copy";
 import { disciplineLabel } from "@/lib/discipline";
+import { formatApiError } from "@/lib/format-api-error";
 
 export function ExamsPage() {
   const { state } = useAuth();
@@ -20,21 +24,31 @@ export function ExamsPage() {
   return (
     <div>
       <section className="panel">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-          <h2 style={{ margin: 0 }}>Provas</h2>
-          <Link to="/provas/nova" className="primary" style={{ textDecoration: "none" }}>
-            Nova prova
-          </Link>
+        <div className="section-header">
+          <h2>Provas</h2>
+          <Button asChild variant="primary">
+            <Link to="/provas/nova">Nova prova</Link>
+          </Button>
         </div>
       </section>
       <section className="panel">
         {q.isLoading ? <p className="muted">Carregando…</p> : null}
         {q.isError ? (
           <p className="error" role="alert">
-            {q.error instanceof ApiError ? q.error.message : "Erro ao listar provas."}
+            {formatApiError(q.error, copy.examListError)}
           </p>
         ) : null}
-        {q.data && q.data.length === 0 ? <p className="muted">Nenhuma prova encontrada.</p> : null}
+        {q.data && q.data.length === 0 ? (
+          <EmptyState
+            title="Nenhuma prova ainda"
+            description="Crie uma prova diagnóstica ou simulado para acompanhar resultados por turma."
+            action={
+              <Button asChild variant="primary">
+                <Link to="/provas/nova">Criar prova</Link>
+              </Button>
+            }
+          />
+        ) : null}
         {q.data && q.data.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table">
@@ -60,7 +74,9 @@ export function ExamsPage() {
                       {disciplineLabel(e.discipline)} · {e.grade}º
                     </td>
                     <td>{e.examType ?? "—"}</td>
-                    <td>{e.status ?? "—"}</td>
+                    <td>
+                      <StatusBadge status={e.status} />
+                    </td>
                     <td>{e.questionCount ?? "—"}</td>
                     <td>
                       <Link to={`/provas/${e._id}`}>Abrir</Link>

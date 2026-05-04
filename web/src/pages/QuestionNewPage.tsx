@@ -2,8 +2,32 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createQuestion, type CreateQuestionBody } from "@/api/questions";
+import { SelectField, type SelectFieldOption } from "@/components/SelectField";
+import { Button } from "@/components/ui/Button";
 import { ApiError } from "@/lib/api-client";
 import { axisLabel, CURRICULUM_AXIS_CODES } from "@/lib/curriculum-axis";
+
+const DISCIPLINE_OPTIONS: SelectFieldOption[] = [
+  { value: "LP", label: "Língua Portuguesa" },
+  { value: "MAT", label: "Matemática" },
+];
+
+const GRADE_OPTIONS: SelectFieldOption[] = [
+  { value: "5", label: "5º" },
+  { value: "9", label: "9º" },
+];
+
+const ANSWER_OPTIONS: SelectFieldOption[] = [
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+];
+
+const AXIS_OPTIONS: SelectFieldOption[] = CURRICULUM_AXIS_CODES.map((code) => ({
+  value: code,
+  label: axisLabel(code),
+}));
 
 export function QuestionNewPage() {
   const navigate = useNavigate();
@@ -57,50 +81,35 @@ export function QuestionNewPage() {
             m.mutate();
           }}
         >
-          <label className="field">
-            Disciplina
-            <select
-              value={form.discipline}
-              onChange={(e) => setForm((f) => ({ ...f, discipline: e.target.value as CreateQuestionBody["discipline"] }))}
-            >
-              <option value="LP">Língua Portuguesa</option>
-              <option value="MAT">Matemática</option>
-            </select>
-          </label>
-          <label className="field">
-            Ano
-            <select
-              value={form.grade}
-              onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value as CreateQuestionBody["grade"] }))}
-            >
-              <option value="5">5º</option>
-              <option value="9">9º</option>
-            </select>
-          </label>
-          <label className="field">
-            Matriz
-            <select
-              value={form.framework ?? "SAEB"}
-              onChange={(e) => setForm((f) => ({ ...f, framework: e.target.value as "SAEB" }))}
-            >
-              <option value="SAEB">SAEB</option>
-            </select>
-          </label>
+          <SelectField
+            label="Disciplina"
+            value={form.discipline}
+            onValueChange={(v) => setForm((f) => ({ ...f, discipline: v as CreateQuestionBody["discipline"] }))}
+            options={DISCIPLINE_OPTIONS}
+          />
+          <SelectField
+            label="Ano"
+            value={form.grade}
+            onValueChange={(v) => setForm((f) => ({ ...f, grade: v as CreateQuestionBody["grade"] }))}
+            options={GRADE_OPTIONS}
+          />
+          <SelectField
+            label="Matriz"
+            value={form.framework ?? "SAEB"}
+            onValueChange={(v) => setForm((f) => ({ ...f, framework: v as "SAEB" }))}
+            options={[{ value: "SAEB", label: "SAEB" }]}
+          />
           <label className="field">
             Descritor / habilidade
             <input value={form.descriptor} onChange={(e) => setForm((f) => ({ ...f, descriptor: e.target.value }))} required minLength={1} />
           </label>
-          <label className="field">
-            Eixo (opcional)
-            <select value={axis} onChange={(e) => setAxis(e.target.value)}>
-              <option value="">nenhum</option>
-              {CURRICULUM_AXIS_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {axisLabel(code)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Eixo (opcional)"
+            value={axis}
+            onValueChange={setAxis}
+            options={AXIS_OPTIONS}
+            emptyOption={{ label: "nenhum" }}
+          />
           <label className="field" style={{ gridColumn: "1 / -1" }}>
             Enunciado
             <textarea value={form.prompt} onChange={(e) => setForm((f) => ({ ...f, prompt: e.target.value }))} required />
@@ -121,22 +130,16 @@ export function QuestionNewPage() {
             Alternativa D
             <input value={form.optionD} onChange={(e) => setForm((f) => ({ ...f, optionD: e.target.value }))} required />
           </label>
-          <label className="field">
-            Gabarito
-            <select
-              value={form.answer}
-              onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value as CreateQuestionBody["answer"] }))}
-            >
-              <option value="A">A</option>
-              <option value="B">B</option>
-              <option value="C">C</option>
-              <option value="D">D</option>
-            </select>
-          </label>
+          <SelectField
+            label="Gabarito"
+            value={form.answer}
+            onValueChange={(v) => setForm((f) => ({ ...f, answer: v as CreateQuestionBody["answer"] }))}
+            options={ANSWER_OPTIONS}
+          />
           <div className="row-actions">
-            <button type="submit" className="primary" disabled={m.isPending}>
+            <Button type="submit" variant="primary" disabled={m.isPending}>
               {m.isPending ? "Salvando…" : "Cadastrar"}
-            </button>
+            </Button>
           </div>
         </form>
       </section>

@@ -1,22 +1,85 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import type { QuestionListItem } from "@/api/questions";
 import { listQuestions } from "@/api/questions";
-import { ApiError } from "@/lib/api-client";
 import { QuestionPreviewModal } from "@/components/QuestionPreviewModal";
-import { disciplineLabel } from "@/lib/discipline";
+import { SelectField, type SelectFieldOption } from "@/components/SelectField";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { axisLabel, CURRICULUM_AXIS_CODES, type CurriculumAxisCode } from "@/lib/curriculum-axis";
+import { copy } from "@/lib/copy";
+import { disciplineLabel } from "@/lib/discipline";
+import { formatApiError } from "@/lib/format-api-error";
+
+const DISCIPLINE_FILTER_OPTIONS: SelectFieldOption[] = [
+  { value: "LP", label: "Língua Portuguesa" },
+  { value: "MAT", label: "Matemática" },
+];
+
+const AXIS_FILTER_OPTIONS: SelectFieldOption[] = CURRICULUM_AXIS_CODES.map((code) => ({
+  value: code,
+  label: axisLabel(code),
+}));
+
+function parseDiscipline(v: string | null): "" | "LP" | "MAT" {
+  if (v === "LP" || v === "MAT") return v;
+  return "";
+}
+
+function parseGrade(v: string | null): "" | "5" | "9" {
+  if (v === "5" || v === "9") return v;
+  return "";
+}
+
+function parseFramework(v: string | null): "" | "SAEB" {
+  if (v === "SAEB") return v;
+  return "";
+}
+
+function parseAxis(v: string | null): "" | CurriculumAxisCode {
+  if (v && (CURRICULUM_AXIS_CODES as readonly string[]).includes(v)) {
+    return v as CurriculumAxisCode;
+  }
+  return "";
+}
 
 export function QuestionsPage() {
   const { state } = useAuth();
+  const [sp, setSp] = useSearchParams();
   const [preview, setPreview] = useState<QuestionListItem | null>(null);
-  const [discipline, setDiscipline] = useState<"" | "LP" | "MAT">("");
-  const [grade, setGrade] = useState<"" | "5" | "9">("");
-  const [framework, setFramework] = useState<"" | "SAEB">("");
-  const [descriptor, setDescriptor] = useState("");
-  const [axis, setAxis] = useState<"" | CurriculumAxisCode>("");
+
+  const discipline = parseDiscipline(sp.get("discipline"));
+  const grade = parseGrade(sp.get("grade"));
+  const framework = parseFramework(sp.get("framework"));
+  const descriptor = sp.get("descriptor") ?? "";
+  const axis = parseAxis(sp.get("axis"));
+
+  const setDiscipline = (v: string) => {
+    const next = new URLSearchParams(sp);
+    if (v) next.set("discipline", v);
+    else next.delete("discipline");
+    setSp(next, { replace: true });
+  };
+  const setGrade = (v: string) => {
+    const next = new URLSearchParams(sp);
+    if (v) next.set("grade", v);
+    else next.delete("grade");
+    setSp(next, { replace: true });
+  };
+  const setFramework = (v: string) => {
+    const next = new URLSearchParams(sp);
+    if (v) next.set("framework", v);
+    else next.delete("framework");
+    setSp(next, { replace: true });
+  };
+  const setAxis = (v: string) => {
+    const next = new URLSearchParams(sp);
+    if (v) next.set("axis", v);
+    else next.delete("axis");
+    setSp(next, { replace: true });
+  };
 
   const filters = useMemo(
     () => ({
@@ -42,55 +105,63 @@ export function QuestionsPage() {
     <div>
       <QuestionPreviewModal question={preview} onClose={() => setPreview(null)} />
       <section className="panel">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-          <h2 style={{ margin: 0 }}>Banco de questões</h2>
+        <div className="section-header">
+          <h2>Banco de questões</h2>
           {state.user.role === "admin" ? (
-            <Link to="/questoes/nova" className="primary" style={{ textDecoration: "none" }}>
-              Nova questão
-            </Link>
+            <Button asChild variant="primary">
+              <Link to="/questoes/nova">Nova questão</Link>
+            </Button>
           ) : null}
         </div>
         <p className="muted small">Professores visualizam e selecionam itens na criação da prova; apenas admin cadastra ou altera o banco.</p>
 
-        <div className="form-grid" style={{ marginTop: "1rem", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}>
-          <label className="field">
-            Disciplina
-            <select value={discipline} onChange={(e) => setDiscipline(e.target.value as typeof discipline)}>
-              <option value="">Todas</option>
-              <option value="LP">Língua Portuguesa</option>
-              <option value="MAT">Matemática</option>
-            </select>
-          </label>
-          <label className="field">
-            Ano
-            <select value={grade} onChange={(e) => setGrade(e.target.value as typeof grade)}>
-              <option value="">Todos</option>
-              <option value="5">5º</option>
-              <option value="9">9º</option>
-            </select>
-          </label>
-          <label className="field">
-            Matriz
-            <select value={framework} onChange={(e) => setFramework(e.target.value as typeof framework)}>
-              <option value="">Todas</option>
-              <option value="SAEB">SAEB</option>
-            </select>
-          </label>
-          <label className="field" style={{ gridColumn: "span 2" }}>
+        <div className="form-grid questions-filters-grid">
+          <SelectField
+            label="Disciplina"
+            value={discipline}
+            onValueChange={setDiscipline}
+            options={DISCIPLINE_FILTER_OPTIONS}
+            emptyOption={{ label: "Todas" }}
+          />
+          <SelectField
+            label="Ano"
+            value={grade}
+            onValueChange={setGrade}
+            options={[
+              { value: "5", label: "5º" },
+              { value: "9", label: "9º" },
+            ]}
+            emptyOption={{ label: "Todos" }}
+          />
+          <SelectField
+            label="Matriz"
+            value={framework}
+            onValueChange={setFramework}
+            options={[{ value: "SAEB", label: "SAEB" }]}
+            emptyOption={{ label: "Todas" }}
+          />
+          <label className="field field--span-2">
             Descritor (contém)
-            <input value={descriptor} onChange={(e) => setDescriptor(e.target.value)} placeholder="Ex.: D3" />
+            <input
+              value={descriptor}
+              onChange={(e) => {
+                const v = e.target.value;
+                const next = new URLSearchParams(sp);
+                if (v.trim()) next.set("descriptor", v);
+                else next.delete("descriptor");
+                setSp(next, { replace: true });
+              }}
+              placeholder="Ex.: D3"
+            />
           </label>
-          <label className="field" style={{ gridColumn: "span 2" }}>
-            Eixo
-            <select value={axis} onChange={(e) => setAxis(e.target.value as typeof axis)}>
-              <option value="">Todos</option>
-              {CURRICULUM_AXIS_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {axisLabel(code)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            label="Eixo"
+            className="field--span-2"
+            value={axis}
+            onValueChange={setAxis}
+            options={AXIS_FILTER_OPTIONS}
+            emptyOption={{ label: "Todos" }}
+          />
         </div>
       </section>
 
@@ -98,10 +169,22 @@ export function QuestionsPage() {
         {q.isLoading ? <p className="muted">Carregando…</p> : null}
         {q.isError ? (
           <p className="error" role="alert">
-            {q.error instanceof ApiError ? q.error.message : "Erro ao listar questões."}
+            {formatApiError(q.error, copy.questionsListError)}
           </p>
         ) : null}
-        {q.data && q.data.length === 0 ? <p className="muted">Nenhuma questão com esses filtros (máx. 200 itens).</p> : null}
+        {q.data && q.data.length === 0 ? (
+          <EmptyState
+            title="Nenhuma questão encontrada"
+            description="Ajuste os filtros ou cadastre novos itens no banco (até 200 resultados por busca)."
+            action={
+              state.user.role === "admin" ? (
+                <Button asChild variant="primary">
+                  <Link to="/questoes/nova">Cadastrar questão</Link>
+                </Button>
+              ) : null
+            }
+          />
+        ) : null}
         {q.data && q.data.length > 0 ? (
           <div className="table-wrap table-wrap--questions">
             <table className="data-table data-table--questions">
