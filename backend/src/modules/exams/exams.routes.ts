@@ -1,4 +1,6 @@
+import type { Response } from "express";
 import { Router } from "express";
+import type { z } from "zod";
 import { Types } from "mongoose";
 import { buildPublicFileUrl, saveBufferToStorage } from "../../lib/file-storage";
 import { canAccessClassroom, canAccessSchool, canAccessStudent } from "../../lib/access";
@@ -53,7 +55,7 @@ async function buildOfficialAnswerKeyItems(examId: string) {
   const questionIds = exam.questions.map((item) => item.questionId);
   const questions = await QuestionModel.find({ _id: { $in: questionIds } }).select("_id answer").lean();
   const byId = new Map(questions.map((question) => [String(question._id), question.answer]));
-  const voided = new Set((exam.voidedQuestionIds ?? []).map((id) => String(id)));
+  const voided = new Set((exam.voidedQuestionIds ?? []).map(String));
 
   return exam.questions
     .slice()
@@ -64,6 +66,187 @@ async function buildOfficialAnswerKeyItems(examId: string) {
       correctAnswer: voided.has(String(item.questionId)) ? ("N/A" as const) : byId.get(String(item.questionId)) ?? "N/A",
       isVoided: voided.has(String(item.questionId)),
     }));
+}
+
+type ListExamsFilters = z.infer<typeof listExamsSchema>;
+
+function buildListExamsMongoQuery(filters: ListExamsFilters): Record<string, unknown> {
+  return {
+    ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
+    ...(filters.classroomId ? { classroomId: filters.classroomId } : {}),
+    ...(filters.discipline ? { discipline: filters.discipline } : {}),
+    ...(filters.grade ? { grade: filters.grade } : {}),
+    ...(filters.framework ? { framework: filters.framework } : {}),
+  };
+}
+
+async function mergeDescriptorAxisFilter(
+  filters: ListExamsFilters,
+  query: Record<string, unknown>,
+  res: Response,
+): Promise<boolean> {
+  if (!filters.descriptor && !filters.axis) {
+    return true;
+  }
+  const questionQuery: Record<string, unknown> = {
+    ...(filters.discipline ? { discipline: filters.discipline } : {}),
+    ...(filters.grade ? { grade: filters.grade } : {}),
+    ...(filters.framework ? { framework: filters.framework } : {}),
+    ...(filters.descriptor ? { descriptor: filters.descriptor } : {}),
+    ...(filters.axis ? { axis: filters.axis } : {}),
+  };
+  const matching = await QuestionModel.find(questionQuery).select("_id").lean();
+  if (matching.length === 0) {
+    res.json([]);
+    return false;
+  }
+  query["questions.questionId"] = { $in: matching.map((m) => m._id) };
+  return true;
+}
+
+function setProfessorClassroomFilter(
+  filters: ListExamsFilters,
+  query: Record<string, unknown>,
+  assigned: string[],
+  res: Response,
+): boolean {
+  const inAssigned = { $in: assigned.map((id) => new Types.ObjectId(id)) };
+  if (!filters.classroomId) {
+    query.classroomId = inAssigned;
+    return true;
+  }
+  if (!assigned.includes(filters.classroomId)) {
+    res.json([]);
+    return false;
+  }
+  query.classroomId = filters.classroomId;
+  return true;
+}
+
+async function applyProfessorListExamsScope(
+  user: AuthUser,
+  filters: ListExamsFilters,
+  query: Record<string, unknown>,
+  res: Response,
+): Promise<boolean> {
+  if (!user.schoolId) {
+    res.status(403).json({ message: "Usuario sem escola vinculada." });
+    return false;
+  }
+  query.schoolId = user.schoolId;
+  const assigned = user.classroomIds.filter((id) => Types.ObjectId.isValid(id));
+  if (assigned.length === 0) {
+    res.json([]);
+    return false;
+  }
+  return setProfessorClassroomFilter(filters, query, assigned, res);
+}
+
+async function applyCoordenadorListExamsScope(
+  user: AuthUser,
+  query: Record<string, unknown>,
+  res: Response,
+): Promise<boolean> {
+  if (!user.schoolId) {
+    res.status(403).json({ message: "Usuario sem escola vinculada." });
+    return false;
+  }
+  query.schoolId = user.schoolId;
+  return true;
+}
+
+async function applyGestorListExamsScope(
+  user: AuthUser,
+  query: Record<string, unknown>,
+  res: Response,
+): Promise<boolean> {
+  if (!user.municipalityCode) {
+    res.status(403).json({ message: "Gestor sem municipio vinculado." });
+    return false;
+  }
+  const schools = await SchoolModel.find({ municipalityCode: user.municipalityCode })
+    .select("_id")
+    .lean();
+  query.schoolId = { $in: schools.map((s) => s._id) };
+  return true;
+}
+
+async function applyListExamsRoleScope(
+  user: AuthUser,
+  filters: ListExamsFilters,
+  query: Record<string, unknown>,
+  res: Response,
+): Promise<boolean> {
+  if (user.role === "professor") {
+    return applyProfessorListExamsScope(user, filters, query, res);
+  }
+  if (user.role === "coordenador") {
+    return applyCoordenadorListExamsScope(user, query, res);
+  }
+  if (user.role === "gestor") {
+    return applyGestorListExamsScope(user, query, res);
+  }
+  return true;
+}
+
+type CreateExamBody = z.infer<typeof createExamSchema>;
+
+async function resolveQuestionIdsFromDescriptorBlueprint(
+  data: CreateExamBody,
+  res: Response,
+): Promise<string[] | null> {
+  const selected: string[] = [];
+  for (const block of data.blueprint ?? []) {
+    const docs = await QuestionModel.find({
+      discipline: data.discipline,
+      grade: data.grade,
+      framework: data.framework,
+      descriptor: block.descriptor,
+      _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
+    })
+      .limit(block.count)
+      .select("_id")
+      .lean();
+
+    if (docs.length < block.count) {
+      res.status(400).json({
+        message: `Banco insuficiente para o descritor ${block.descriptor}.`,
+      });
+      return null;
+    }
+
+    selected.push(...docs.map((doc) => String(doc._id)));
+  }
+  return selected;
+}
+
+async function resolveQuestionIdsFromAxisBlueprint(
+  data: CreateExamBody,
+  res: Response,
+): Promise<string[] | null> {
+  const selected: string[] = [];
+  for (const block of data.blueprintByAxis ?? []) {
+    const docs = await QuestionModel.find({
+      discipline: data.discipline,
+      grade: data.grade,
+      framework: data.framework,
+      axis: block.axis,
+      _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
+    })
+      .limit(block.count)
+      .select("_id")
+      .lean();
+
+    if (docs.length < block.count) {
+      res.status(400).json({
+        message: `Banco insuficiente para o eixo ${block.axis}. Cadastre questoes com esse eixo ou ajuste o simulado.`,
+      });
+      return null;
+    }
+
+    selected.push(...docs.map((doc) => String(doc._id)));
+  }
+  return selected;
 }
 
 examsRouter.get("/blueprint/simulado", requireAuth, async (req, res, next) => {
@@ -119,52 +302,13 @@ examsRouter.get("/:id/answer-sheets", requireAuth, async (req, res, next) => {
 examsRouter.get("/", requireAuth, async (req, res, next) => {
   try {
     const filters = listExamsSchema.parse(req.query);
-    const query: Record<string, unknown> = {
-      ...(filters.schoolId ? { schoolId: filters.schoolId } : {}),
-      ...(filters.classroomId ? { classroomId: filters.classroomId } : {}),
-      ...(filters.discipline ? { discipline: filters.discipline } : {}),
-      ...(filters.grade ? { grade: filters.grade } : {}),
-    };
+    const query = buildListExamsMongoQuery(filters);
 
-    if (req.user!.role === "professor") {
-      if (!req.user!.schoolId) {
-        res.status(403).json({ message: "Usuario sem escola vinculada." });
-        return;
-      }
-      query.schoolId = req.user!.schoolId;
-      const assigned = req.user!.classroomIds.filter((id) => Types.ObjectId.isValid(id));
-      if (assigned.length === 0) {
-        res.json([]);
-        return;
-      }
-      const inAssigned = { $in: assigned.map((id) => new Types.ObjectId(id)) };
-      if (filters.classroomId) {
-        if (!assigned.includes(filters.classroomId)) {
-          res.json([]);
-          return;
-        }
-        query.classroomId = filters.classroomId;
-      } else {
-        query.classroomId = inAssigned;
-      }
-    } else if (req.user!.role === "coordenador") {
-      if (!req.user!.schoolId) {
-        res.status(403).json({ message: "Usuario sem escola vinculada." });
-        return;
-      }
-      query.schoolId = req.user!.schoolId;
+    if (!(await applyListExamsRoleScope(req.user!, filters, query, res))) {
+      return;
     }
-
-    if (req.user!.role === "gestor") {
-      if (!req.user!.municipalityCode) {
-        res.status(403).json({ message: "Gestor sem municipio vinculado." });
-        return;
-      }
-      const schools = await SchoolModel.find({ municipalityCode: req.user!.municipalityCode })
-        .select("_id")
-        .lean();
-      const ids = schools.map((s) => s._id);
-      query.schoolId = { $in: ids };
+    if (!(await mergeDescriptorAxisFilter(filters, query, res))) {
+      return;
     }
 
     const exams = await ExamModel.find(query).sort({ createdAt: -1 }).lean();
@@ -265,56 +409,21 @@ examsRouter.post(
 
       const sourceType = data.sourceType ?? "QUESTION_BANK";
       let questionIds: string[] = data.questionIds ? [...data.questionIds] : [];
-      const selected: string[] = [];
 
       if (sourceType === "QUESTION_BANK" && data.blueprint?.length) {
-        for (const block of data.blueprint) {
-          const docs = await QuestionModel.find({
-            discipline: data.discipline,
-            grade: data.grade,
-            framework: data.framework,
-            descriptor: block.descriptor,
-            _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
-          })
-            .limit(block.count)
-            .select("_id")
-            .lean();
-
-          if (docs.length < block.count) {
-            res.status(400).json({
-              message: `Banco insuficiente para o descritor ${block.descriptor}.`,
-            });
-            return;
-          }
-
-          selected.push(...docs.map((doc) => String(doc._id)));
+        const fromDescriptor = await resolveQuestionIdsFromDescriptorBlueprint(data, res);
+        if (fromDescriptor === null) {
+          return;
         }
-        questionIds = selected;
+        questionIds = fromDescriptor;
       }
 
       if (sourceType === "QUESTION_BANK" && data.blueprintByAxis?.length) {
-        for (const block of data.blueprintByAxis) {
-          const docs = await QuestionModel.find({
-            discipline: data.discipline,
-            grade: data.grade,
-            framework: data.framework,
-            axis: block.axis,
-            _id: { $nin: selected.map((id) => new Types.ObjectId(id)) },
-          })
-            .limit(block.count)
-            .select("_id")
-            .lean();
-
-          if (docs.length < block.count) {
-            res.status(400).json({
-              message: `Banco insuficiente para o eixo ${block.axis}. Cadastre questoes com esse eixo ou ajuste o simulado.`,
-            });
-            return;
-          }
-
-          selected.push(...docs.map((doc) => String(doc._id)));
+        const fromAxis = await resolveQuestionIdsFromAxisBlueprint(data, res);
+        if (fromAxis === null) {
+          return;
         }
-        questionIds = selected;
+        questionIds = fromAxis;
       }
 
       const questions =

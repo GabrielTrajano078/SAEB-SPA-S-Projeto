@@ -61,6 +61,9 @@ export const listExamsSchema = z.object({
   classroomId: objectIdSchema.optional(),
   discipline: disciplineSchema.optional(),
   grade: gradeSchema.optional(),
+  framework: frameworkSchema.optional(),
+  descriptor: z.string().min(1).optional(),
+  axis: curriculumAxisSchema.optional(),
 });
 
 export const simulatedBlueprintQuerySchema = z.object({

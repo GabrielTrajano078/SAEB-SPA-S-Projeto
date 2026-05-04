@@ -20,13 +20,17 @@ export async function listExams(params?: {
   classroomId?: string;
   discipline?: "LP" | "MAT";
   grade?: "5" | "9";
+  framework?: "SAEB";
+  descriptor?: string;
+  axis?: string;
 }): Promise<ExamListItem[]> {
   const sp = new URLSearchParams();
   Object.entries(params ?? {}).forEach(([k, v]) => {
     if (v) sp.set(k, v);
   });
   const q = sp.toString();
-  return apiFetch(`/api/exams${q ? `?${q}` : ""}`);
+  const path = q ? `/api/exams?${q}` : "/api/exams";
+  return apiFetch(path);
 }
 
 export type ExamDetail = ExamListItem & {
