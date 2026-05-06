@@ -1,23 +1,29 @@
 :root {
   color-scheme: dark;
+  /* EducaHub Educacional */
+  --brand-navy: #00153b;
+  --brand-cyan: #3abef9;
+  --brand-green: #89d14f;
+  --brand-orange: #f59e0b;
   --sidebar-width: 17rem;
-  --bg: #070a0d;
-  --bg-elevated: #0d1118;
-  --surface: rgba(18, 24, 34, 0.78);
-  --surface-solid: #121822;
-  --surface-hover: rgba(32, 42, 58, 0.95);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.11);
-  --text: #dde3ec;
-  --muted: #8b98a8;
+  --sidebar-width-collapsed: 4.75rem;
+  --bg: #00153b;
+  --bg-elevated: #001f52;
+  --surface: rgba(0, 31, 82, 0.82);
+  --surface-solid: #00265e;
+  --surface-hover: rgba(0, 45, 110, 0.95);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text: #ffffff;
+  --muted: #9bb8d4;
   --warning: #fbbf24;
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
-  --accent-muted: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent: var(--brand-cyan);
+  --accent-hover: #62d4ff;
+  --accent-glow: color-mix(in srgb, var(--accent) 42%, transparent);
+  --accent-muted: color-mix(in srgb, var(--accent) 16%, transparent);
   --danger: #f87171;
-  --ok: #34d399;
-  --ring: #93c5fd;
+  --ok: var(--brand-green);
+  --ring: var(--brand-cyan);
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-optical-sizing: auto;
   line-height: 1.5;
@@ -72,9 +78,9 @@ a:hover {
   pointer-events: none;
   background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 100% 80% at 0% -20%, rgba(59, 130, 246, 0.16), transparent 50%),
-    radial-gradient(ellipse 70% 60% at 100% 0%, rgba(139, 92, 246, 0.1), transparent 45%),
-    radial-gradient(ellipse 60% 50% at 50% 100%, rgba(16, 185, 129, 0.06), transparent 45%),
+    radial-gradient(ellipse 100% 80% at 0% -20%, color-mix(in srgb, var(--brand-cyan) 22%, transparent), transparent 52%),
+    radial-gradient(ellipse 70% 55% at 100% 0%, color-mix(in srgb, var(--brand-orange) 12%, transparent), transparent 48%),
+    radial-gradient(ellipse 55% 45% at 50% 100%, color-mix(in srgb, var(--brand-green) 10%, transparent), transparent 50%),
     linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size:
@@ -86,14 +92,12 @@ a:hover {
   background-position: center;
 }
 
+/* Wrapper: no desktop, barra estreita; só o hover expande a largura total */
+.sidebar-dock {
+  width: 100%;
+}
+
 .sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 100;
-  width: var(--sidebar-width);
-  height: 100vh;
-  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-strong);
@@ -104,6 +108,125 @@ a:hover {
   overflow: hidden;
 }
 
+@media (min-width: 769px) {
+  .sidebar-dock {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    width: var(--sidebar-width-collapsed);
+    height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+    transition:
+      width 0.24s ease,
+      box-shadow 0.24s ease;
+  }
+
+  .sidebar-dock:hover {
+    width: var(--sidebar-width);
+    box-shadow: 8px 0 40px color-mix(in srgb, #000 40%, transparent);
+  }
+
+  .sidebar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--sidebar-width);
+    height: 100%;
+    max-height: 100dvh;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-brand-text {
+    display: none;
+  }
+
+  /* Conteúdo da sidebar tem largura total (17rem); só a faixa esquerda aparece.
+     Centralizar empurra logo/ícones para o meio — fora da área visível. */
+  .sidebar-dock:not(:hover) .sidebar-brand {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0.65rem 0.4rem 0.75rem;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-brand-logo-wrap {
+    width: auto;
+    max-width: calc(var(--sidebar-width-collapsed) - 0.35rem);
+    justify-content: flex-start;
+    padding: 0;
+  }
+
+  .sidebar-dock:not(:hover) .brand-logo--sidebar {
+    width: auto;
+    max-width: calc(var(--sidebar-width-collapsed) - 0.35rem);
+    max-height: 3rem;
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar-dock:not(:hover) .nav-link-label {
+    display: none;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-nav {
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+  }
+
+  .sidebar-dock:not(:hover) .nav-link-side {
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0.55rem 0.4rem;
+  }
+
+  .sidebar-dock:not(:hover) .nav-link-side .nav-icon {
+    width: 22px;
+    height: 22px;
+    opacity: 1;
+    flex-shrink: 0;
+  }
+
+  .sidebar-dock:not(:hover) .nav-link-side.active {
+    box-shadow: none;
+    background: var(--accent-muted);
+    border-bottom: 2px solid var(--accent);
+    border-radius: 10px;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-user-meta {
+    display: none;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-user-card {
+    justify-content: flex-start;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.4rem;
+  }
+
+  .sidebar-dock:not(:hover) .sidebar-logout {
+    width: auto;
+    max-width: calc(var(--sidebar-width-collapsed) - 0.5rem);
+    align-self: flex-start;
+    padding: 0.45rem 0.35rem;
+    font-size: 0.62rem;
+    text-align: center;
+  }
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: reduce) {
+  .sidebar-dock,
+  .app-main {
+    transition: none;
+  }
+}
+
 .sidebar-brand {
   display: flex;
   align-items: flex-start;
@@ -112,23 +235,30 @@ a:hover {
   border-bottom: 1px solid var(--border);
 }
 
-.sidebar-logo {
+.sidebar-brand-logo-wrap {
   flex-shrink: 0;
-  width: 2.35rem;
-  height: 2.35rem;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
-  box-shadow: 0 4px 16px var(--accent-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem 0;
 }
 
-.sidebar-logo-mark {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -0.05em;
-  line-height: 1;
+.brand-logo {
+  display: block;
+  height: auto;
+  object-fit: contain;
+}
+
+.brand-logo--sidebar {
+  max-height: 2.65rem;
+  max-width: 8.75rem;
+  width: auto;
+}
+
+.brand-logo--auth {
+  max-height: 3.15rem;
+  max-width: 12rem;
+  width: auto;
 }
 
 .sidebar-brand-text {
@@ -248,7 +378,7 @@ a:hover {
   font-size: 0.95rem;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(145deg, #475569, #1e293b);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-cyan) 35%, #1a3a66), var(--brand-navy));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
@@ -304,11 +434,23 @@ a:hover {
 .app-main {
   position: relative;
   z-index: 1;
-  margin-left: var(--sidebar-width);
+  margin-left: 0;
   min-width: 0;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
+}
+
+@media (min-width: 769px) {
+  .app-main {
+    margin-left: var(--sidebar-width-collapsed);
+    transition: margin-left 0.24s ease;
+  }
+
+  .sidebar-dock:hover ~ .app-main {
+    margin-left: var(--sidebar-width);
+  }
 }
 
 .content {
@@ -320,11 +462,12 @@ a:hover {
 
 .content-wide {
   max-width: 1280px;
+  width: min(100%, 1280px);
   margin: 0;
-  width: 100%;
   flex: 1;
   padding: 1.75rem 1.75rem 2.5rem;
   min-height: 100vh;
+  box-sizing: border-box;
 }
 
 @media (min-width: 900px) {
@@ -532,8 +675,21 @@ a:hover {
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--brand-navy) 40%, var(--accent)) 100%);
   box-shadow: 0 6px 20px var(--accent-glow);
+}
+
+.auth-logo--brand {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: 3rem;
+  padding: 0.15rem 0.25rem;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .auth-logo-mark {
@@ -631,7 +787,10 @@ a:hover {
   padding: 0.75rem 1rem;
   border-radius: 10px;
   font-size: 0.95rem;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
+  font-weight: 600;
+  box-shadow:
+    0 4px 14px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand-green) 25%, transparent);
 }
 
 .auth-submit:hover:not(:disabled) {
@@ -1405,6 +1564,10 @@ a.ghost {
 }
 
 @media (max-width: 768px) {
+  .sidebar-dock {
+    width: 100%;
+  }
+
   .sidebar {
     position: relative;
     width: 100%;
@@ -1482,20 +1645,20 @@ a.ghost {
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --bg: #f4f6f9;
+    --bg: #e8f4fc;
     --bg-elevated: #ffffff;
-    --surface: rgba(255, 255, 255, 0.82);
+    --surface: rgba(255, 255, 255, 0.9);
     --surface-solid: #ffffff;
-    --surface-hover: #f1f5f9;
-    --border: rgba(15, 23, 42, 0.08);
-    --border-strong: rgba(15, 23, 42, 0.12);
-    --text: #0f172a;
-    --muted: #64748b;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-    --accent-glow: color-mix(in srgb, var(--accent) 25%, transparent);
-    --accent-muted: color-mix(in srgb, var(--accent) 12%, transparent);
-    --ring: #2563eb;
+    --surface-hover: #e3f2fb;
+    --border: color-mix(in srgb, var(--brand-navy) 10%, transparent);
+    --border-strong: color-mix(in srgb, var(--brand-navy) 14%, transparent);
+    --text: var(--brand-navy);
+    --muted: #3d5a80;
+    --accent: #0891c9;
+    --accent-hover: #0aa6e3;
+    --accent-glow: color-mix(in srgb, var(--accent) 22%, transparent);
+    --accent-muted: color-mix(in srgb, var(--accent) 14%, transparent);
+    --ring: var(--accent);
   }
 
   .primary {
@@ -1503,12 +1666,13 @@ a.ghost {
   }
 
   .app-canvas {
+    background-color: #f0f8fd;
     background-image:
-      radial-gradient(ellipse 100% 80% at 0% -20%, rgba(37, 99, 235, 0.12), transparent 50%),
-      radial-gradient(ellipse 70% 60% at 100% 0%, rgba(139, 92, 246, 0.08), transparent 45%),
-      radial-gradient(ellipse 60% 50% at 50% 100%, rgba(16, 185, 129, 0.05), transparent 45%),
-      linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+      radial-gradient(ellipse 100% 80% at 0% -15%, color-mix(in srgb, var(--brand-cyan) 14%, transparent), transparent 50%),
+      radial-gradient(ellipse 70% 55% at 100% 0%, color-mix(in srgb, var(--brand-orange) 8%, transparent), transparent 48%),
+      radial-gradient(ellipse 55% 45% at 50% 100%, color-mix(in srgb, var(--brand-green) 8%, transparent), transparent 50%),
+      linear-gradient(color-mix(in srgb, var(--brand-navy) 06%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--brand-navy) 06%, transparent) 1px, transparent 1px);
     background-size: auto, auto, auto, 48px 48px, 48px 48px;
   }
 
