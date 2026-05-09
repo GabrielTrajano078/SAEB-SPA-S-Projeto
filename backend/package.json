@@ -7,6 +7,10 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
+    "test": "NODE_ENV=test jest",
+    "test:unit": "NODE_ENV=test jest tests/unit",
+    "test:integration": "NODE_ENV=test jest tests/integration",
+    "test:contract": "NODE_ENV=test jest tests/contract",
     "check": "tsc --noEmit",
     "seed": "tsx src/scripts/seed.ts",
     "db:up": "docker compose up -d",
@@ -34,6 +38,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/supertest": "^6.0.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -42,6 +48,9 @@
     "@types/node": "^25.5.0",
     "@types/qrcode": "^1.5.6",
     "@types/swagger-ui-express": "^4.1.8",
+    "jest": "^29.7.0",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.6",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"
