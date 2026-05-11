@@ -67,6 +67,7 @@ a:hover {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
 }
 
@@ -558,23 +559,16 @@ a:hover {
 .app-main {
   position: relative;
   z-index: 1;
-  margin-left: 0;
+  margin-left: var(--sidebar-width);
+  /* Sidebar é fixed: 100% da largura + margem estoura a viewport e esconde conteúdo à direita. */
+  width: calc(100% - var(--sidebar-width));
+  box-sizing: border-box;
   min-width: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-}
-
-@media (min-width: 769px) {
-  .app-main {
-    margin-left: var(--sidebar-width-collapsed);
-    transition: margin-left 0.24s ease;
-  }
-
-  .sidebar-dock.sidebar-dock--expanded ~ .app-main {
-    margin-left: var(--sidebar-width);
-  }
+  align-items: stretch;
 }
 
 .content {
@@ -585,18 +579,33 @@ a:hover {
 }
 
 .content-wide {
-  max-width: 1280px;
-  width: min(100%, 1280px);
+  max-width: none;
   margin: 0;
   flex: 1;
-  padding: 1.75rem 1.75rem 2.5rem;
+  padding: clamp(1rem, 2.5vw, 2rem) clamp(0.65rem, 2.5vw, 2.25rem) clamp(1.25rem, 3vw, 3rem);
   min-height: 100vh;
+  min-height: 100dvh;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wide > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wide > * .panel {
+  min-width: 0;
 }
 
 @media (min-width: 900px) {
   .content-wide {
-    padding: 2rem 2.25rem 3rem;
+    padding: clamp(1.25rem, 2vw, 2rem) clamp(1rem, 3vw, 2.25rem) clamp(1.5rem, 3vw, 3rem);
   }
 }
 
@@ -1009,9 +1018,9 @@ a.ghost {
   border: 1px solid var(--border-strong);
   background: color-mix(in srgb, var(--surface) 55%, transparent);
   color: var(--text);
+  font: inherit;
   font-weight: 600;
   cursor: pointer;
-  font: inherit;
 }
 
 .button-secondary:hover:not(:disabled) {
@@ -1392,6 +1401,60 @@ a.ghost {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 
+.form-grid.question-new-form {
+  max-width: none;
+  width: 100%;
+}
+
+.form-grid .question-new-meta-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.75fr) minmax(0, 0.85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.form-grid .question-new-alternatives-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.form-grid .question-new-alternatives-row .field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .form-grid .question-new-meta-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-grid .question-new-alternatives-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.page-content-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.page-content-fill > .panel.panel--fill-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - clamp(5.5rem, 18vmin, 8.5rem));
+  min-width: 0;
+  /* O formulário tem altura intrínseca; sem overflow o flex podia “esmagar” o form e esconder o rodapé (botão). */
+  overflow-y: auto;
+}
+
 .classroom-import-panel {
   max-width: 480px;
   margin-top: 1.25rem;
@@ -1505,6 +1568,7 @@ a.ghost {
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
   animation: modal-in 0.18s ease-out;
+  flex: none;
 }
 
 @keyframes modal-in {
@@ -1530,6 +1594,15 @@ a.ghost {
     0 0 0 1px rgba(255, 255, 255, 0.06) inset,
     0 24px 64px -12px rgba(0, 0, 0, 0.55);
   animation: modal-dialog-in 0.22s ease-out;
+}
+
+.modal-dialog--question-new {
+  max-width: min(1040px, calc(100vw - 2rem));
+  max-height: min(92vh, 860px);
+}
+
+.modal-dialog--question-new .modal-body {
+  padding: 1.35rem 1.5rem 1.5rem;
 }
 
 @keyframes modal-dialog-in {
@@ -1763,6 +1836,7 @@ a.ghost {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
   color: color-mix(in srgb, var(--text) 92%, var(--muted));
 }
@@ -1834,6 +1908,7 @@ a.ghost {
 
   .app-main {
     margin-left: 0;
+    width: 100%;
   }
 
   .sidebar-footer {
@@ -1852,7 +1927,7 @@ a.ghost {
   }
 
   .content-wide {
-    padding: 1.25rem 1rem 2rem;
+    padding: 1rem clamp(0.45rem, 2vw, 1rem) 1.75rem;
   }
 }
 
