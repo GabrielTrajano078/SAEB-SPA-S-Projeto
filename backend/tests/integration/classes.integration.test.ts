@@ -22,6 +22,11 @@ const validOid = "507f1f77bcf86cd799439011";
 const otherOid = "507f1f77bcf86cd799439012";
 
 type Role = "admin" | "professor" | "coordenador" | "gestor";
+type AsyncMock = jest.MockedFunction<(...args: unknown[]) => Promise<unknown>>;
+
+function asAsyncMock(fn: unknown): AsyncMock {
+  return fn as AsyncMock;
+}
 
 function bearer(role: Role, payload: { schoolId?: string | null; classroomIds?: string[]; municipalityCode?: string | null } = {}): string {
   const token = jwt.sign(
@@ -39,13 +44,13 @@ function bearer(role: Role, payload: { schoolId?: string | null; classroomIds?: 
 }
 
 function mockClassroomFindReturns(rows: unknown[]): void {
-  const lean = jest.fn().mockResolvedValue(rows);
+  const lean = jest.fn<() => Promise<unknown[]>>().mockResolvedValue(rows);
   const sort = jest.fn().mockReturnValue({ lean });
   (ClassroomModel.find as jest.Mock).mockReturnValue({ sort });
 }
 
 function mockClassroomFindChain(rows: unknown[]): { sort: jest.Mock; lean: jest.Mock } {
-  const lean = jest.fn().mockResolvedValue(rows);
+  const lean = jest.fn<() => Promise<unknown[]>>().mockResolvedValue(rows);
   const sort = jest.fn().mockReturnValue({ lean });
   (ClassroomModel.find as jest.Mock).mockReturnValue({ sort });
   return { sort, lean };
@@ -54,7 +59,7 @@ function mockClassroomFindChain(rows: unknown[]): { sort: jest.Mock; lean: jest.
 describe("POST /api/classes", () => {
   beforeEach(() => {
     jest.mocked(access.canAccessSchool).mockReset();
-    (ClassroomModel.create as jest.Mock).mockReset();
+    asAsyncMock(ClassroomModel.create).mockReset();
   });
 
   it("401 sem Authorization", async () => {
@@ -113,7 +118,7 @@ describe("POST /api/classes", () => {
 
   it("409 em violacao de unicidade (codigo 11000)", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
-    (ClassroomModel.create as jest.Mock).mockRejectedValue({ code: 11000 });
+    asAsyncMock(ClassroomModel.create).mockRejectedValue({ code: 11000 });
 
     const res = await request(app)
       .post("/api/classes")
@@ -130,7 +135,7 @@ describe("POST /api/classes", () => {
 
   it("500 quando create falha com codigo diferente de duplicidade", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
-    (ClassroomModel.create as jest.Mock).mockRejectedValue({ code: 11001 });
+    asAsyncMock(ClassroomModel.create).mockRejectedValue({ code: 11001 });
 
     const res = await request(app)
       .post("/api/classes")
@@ -147,7 +152,7 @@ describe("POST /api/classes", () => {
 
   it("500 quando create falha com valor primitivo", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
-    (ClassroomModel.create as jest.Mock).mockRejectedValue("falha persistencia");
+    asAsyncMock(ClassroomModel.create).mockRejectedValue("falha persistencia");
 
     const res = await request(app)
       .post("/api/classes")
@@ -165,7 +170,7 @@ describe("POST /api/classes", () => {
   it("500 quando create falha com funcao que possui codigo de duplicidade", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
     const errorWithCode = Object.assign(() => undefined, { code: 11000 });
-    (ClassroomModel.create as jest.Mock).mockRejectedValue(errorWithCode);
+    asAsyncMock(ClassroomModel.create).mockRejectedValue(errorWithCode);
 
     const res = await request(app)
       .post("/api/classes")
@@ -182,7 +187,7 @@ describe("POST /api/classes", () => {
 
   it("500 quando create falha com erro que nao e duplicata", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
-    (ClassroomModel.create as jest.Mock).mockRejectedValue(new Error("falha persistencia"));
+    asAsyncMock(ClassroomModel.create).mockRejectedValue(new Error("falha persistencia"));
 
     const res = await request(app)
       .post("/api/classes")
@@ -200,7 +205,7 @@ describe("POST /api/classes", () => {
   it("201 para coordenador autorizado", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
     const createdId = new Types.ObjectId();
-    (ClassroomModel.create as jest.Mock).mockResolvedValue({ _id: createdId });
+    asAsyncMock(ClassroomModel.create).mockResolvedValue({ _id: createdId });
 
     const res = await request(app)
       .post("/api/classes")
@@ -218,7 +223,7 @@ describe("POST /api/classes", () => {
   it("201 e retorna id quando criacao ok", async () => {
     jest.mocked(access.canAccessSchool).mockResolvedValue(true);
     const createdId = new Types.ObjectId();
-    (ClassroomModel.create as jest.Mock).mockResolvedValue({ _id: createdId });
+    asAsyncMock(ClassroomModel.create).mockResolvedValue({ _id: createdId });
 
     const res = await request(app)
       .post("/api/classes")
