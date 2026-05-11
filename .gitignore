@@ -9,3 +9,6 @@ web/dist/
 backend/uploads/
 backend/reports/mutation/
 backend/.stryker-tmp/
+
+# Ferramentas locais (ex.: gh CLI baixado no projeto)
+.tools/
