@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
-import { AuthUser, UserRole } from "../types/auth";
+import type { AuthUser, UserRole } from "../types/auth";
 
-const ROLES: UserRole[] = ["admin", "professor", "coordenador", "gestor"];
+const ROLES = new Set<UserRole>(["admin", "professor", "coordenador", "gestor"]);
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -16,20 +16,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   const token = authHeader.replace("Bearer ", "");
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as AuthUser & Record<string, unknown>;
-    if (!ROLES.includes(payload.role as UserRole)) {
+    const payload = jwt.verify(token, env.JWT_SECRET) as AuthUser;
+    if (!ROLES.has(payload.role)) {
       res.status(401).json({ message: "Token invalido." });
       return;
     }
 
     const rawClassrooms = payload.classroomIds;
     const classroomIds = Array.isArray(rawClassrooms)
-      ? rawClassrooms.map((id) => String(id))
+      ? rawClassrooms.map(String)
       : [];
 
     req.user = {
       id: String(payload.id),
-      role: payload.role as UserRole,
+      role: payload.role,
       schoolId: payload.schoolId ?? null,
       municipalityCode: payload.municipalityCode ?? null,
       classroomIds,

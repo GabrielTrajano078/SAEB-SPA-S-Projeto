@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const loginSchema = z.object({
   email: z.string().email("Email invalido."),
-  password: z.string().min(6, "Senha deve ter no minimo 6 caracteres."),
+  password: z.string().min(1, "Informe a senha."),
 });
 
 export const bootstrapAdminSchema = z.object({

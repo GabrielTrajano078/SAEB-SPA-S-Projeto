@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useAuth } from "@/auth/useAuth";
@@ -27,7 +27,7 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     const parsed = loginFormSchema.safeParse(values);
@@ -62,7 +62,7 @@ export function LoginPage() {
             <p className="auth-subtitle">Painel de diagnóstico · matriz SAEB</p>
           </div>
         </header>
-        <form onSubmit={handleSubmit} className="stack auth-form">
+        <form onSubmit={handleSubmit} className="stack auth-form" noValidate>
           <label className="field">
             <span className="field-label">E-mail</span>
             <input
@@ -70,7 +70,6 @@ export function LoginPage() {
               autoComplete="username"
               value={values.email}
               onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-              required
               placeholder="seu@email.com"
             />
           </label>
@@ -81,7 +80,6 @@ export function LoginPage() {
               autoComplete="current-password"
               value={values.password}
               onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-              required
               placeholder="••••••••"
             />
           </label>

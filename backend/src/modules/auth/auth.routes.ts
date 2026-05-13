@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { env } from "../../config/env";
@@ -34,24 +34,40 @@ authRouter.post("/bootstrap-admin", async (req, res, next) => {
   }
 });
 
+function invalidLoginResponse(res: Response): void {
+  res.status(401).json({ message: "Credenciais invalidas." });
+}
+
 authRouter.post("/login", async (req, res, next) => {
   try {
     const data = loginSchema.parse(req.body);
 
     const user = await UserModel.findOne({ email: data.email }).lean();
     if (!user) {
-      res.status(401).json({ message: "Credenciais invalidas." });
+      invalidLoginResponse(res);
       return;
     }
 
-    const passwordOk = await bcrypt.compare(data.password, user.passwordHash);
+    const hash = user.passwordHash;
+    if (typeof hash !== "string" || hash.length === 0) {
+      invalidLoginResponse(res);
+      return;
+    }
+
+    let passwordOk = false;
+    try {
+      passwordOk = await bcrypt.compare(data.password, hash);
+    } catch {
+      invalidLoginResponse(res);
+      return;
+    }
 
     if (!passwordOk) {
-      res.status(401).json({ message: "Credenciais invalidas." });
+      invalidLoginResponse(res);
       return;
     }
 
-    const classroomIds = (user.classroomIds ?? []).map((id) => String(id));
+    const classroomIds = (user.classroomIds ?? []).map(String);
 
     const token = jwt.sign(
       {
@@ -93,7 +109,7 @@ authRouter.get("/me", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const classroomIds = (user.classroomIds ?? []).map((id) => String(id));
+    const classroomIds = (user.classroomIds ?? []).map(String);
 
     res.json({
       id: String(user._id),

@@ -1,4 +1,4 @@
-import path from "path";
+import path from "node:path";
 import { Router } from "express";
 import { Types } from "mongoose";
 import { buildPublicFileUrl, getUploadRoot, saveBufferToStorage } from "../../lib/file-storage";
@@ -9,7 +9,6 @@ import { requireAuth, requireRole } from "../../middlewares/auth";
 import { ClassroomModel } from "../classes/classroom.model";
 import { ExamModel } from "../exams/exam.model";
 import { OfficialAnswerKeyModel } from "../exams/official-answer-key.model";
-import { QuestionModel } from "../questions/question.model";
 import { SchoolModel } from "../schools/school.model";
 import { StudentModel } from "../students/student.model";
 import { generateUniqueSheetCode } from "./answer-sheet-code";
@@ -20,7 +19,6 @@ import { aggregateAxisStats, aggregateDescriptorStats } from "./results.aggregat
 import { ResultModel } from "./result.model";
 import {
   answerSheetIdParamSchema,
-  answerSheetScanParamsSchema,
   classroomHeatmapSchema,
   classroomRankingSchema,
   classroomReportSchema,
@@ -172,7 +170,7 @@ async function persistExamCorrection(
   }));
 
   const submittedOrders = resolvedAnswers.map((a) => a.order);
-  if (submittedOrders.some((order) => order === undefined)) {
+  if (submittedOrders.includes(undefined)) {
     throw Object.assign(new Error("Nao foi possivel identificar a ordem de todas as questoes."), {
       statusCode: 400,
     });
@@ -795,7 +793,7 @@ resultsRouter.get(
 
       for (const sh of sheets) {
         const exam = await ExamModel.findById(sh.examId).select("voidedQuestionIds").lean();
-        const voided = new Set((exam?.voidedQuestionIds ?? []).map((id) => String(id)));
+        const voided = new Set((exam?.voidedQuestionIds ?? []).map(String));
 
         const results = await ResultModel.find({ answerSheetId: sh._id }).select("questionId isCorrect").lean();
         let totalEffective = 0;

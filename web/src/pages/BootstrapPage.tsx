@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type SyntheticEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { bootstrapAdmin } from "@/api/auth";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -16,7 +16,7 @@ export function BootstrapPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -54,13 +54,12 @@ export function BootstrapPage() {
             <p className="auth-subtitle">Somente quando ainda não existem usuários na base.</p>
           </div>
         </header>
-        <form onSubmit={handleSubmit} className="stack auth-form">
+        <form onSubmit={handleSubmit} className="stack auth-form" noValidate>
           <label className="field">
             <span className="field-label">Nome completo</span>
             <input
               value={values.fullName}
               onChange={(e) => setValues((v) => ({ ...v, fullName: e.target.value }))}
-              required
             />
           </label>
           <label className="field">
@@ -70,7 +69,6 @@ export function BootstrapPage() {
               autoComplete="username"
               value={values.email}
               onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-              required
             />
           </label>
           <label className="field">
@@ -80,19 +78,17 @@ export function BootstrapPage() {
               autoComplete="new-password"
               value={values.password}
               onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-              required
-              minLength={6}
             />
           </label>
           {error ? (
-            <p className="error" role="alert">
+            <p className="error auth-error" role="alert">
               {error}
             </p>
           ) : null}
           {success ? (
-            <p className="success" role="status">
+            <output className="success" aria-live="polite">
               {success}
-            </p>
+            </output>
           ) : null}
           <button type="submit" className="primary auth-submit" disabled={submitting}>
             {submitting ? "Criando…" : "Criar administrador"}
