@@ -12,5 +12,12 @@
   "mutate": ["src/**/*.ts", "!src/scripts/**"],
   "timeoutMS": 20000,
   "concurrency": 4,
-  "ignorePatterns": ["dist", "uploads", ".stryker-tmp"]
+  "ignorePatterns": ["dist", "uploads", ".stryker-tmp"],
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
+  "thresholds": {
+    "high": 80,
+    "low": 70,
+    "break": 70
+  }
 }

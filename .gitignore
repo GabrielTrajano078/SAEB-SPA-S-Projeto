@@ -8,6 +8,7 @@ web/dist/
 .env
 backend/uploads/
 backend/reports/mutation/
+backend/reports/stryker-incremental.json
 backend/.stryker-tmp/
 
 # Ferramentas locais (ex.: gh CLI baixado no projeto)

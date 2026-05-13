@@ -12,6 +12,7 @@
     "test:integration": "NODE_ENV=test jest tests/integration",
     "test:contract": "NODE_ENV=test jest tests/contract",
     "test:mutation": "stryker run",
+    "test:mutation:ci": "NODE_ENV=test stryker run --concurrency 2",
     "test:mutation:dry": "stryker run --dryRunOnly",
     "check": "tsc --noEmit",
     "seed": "tsx src/scripts/seed.ts",

@@ -8,8 +8,9 @@ on:
 
 jobs:
   backend-tests:
-    name: Backend tests
+    name: Backend tests & mutation
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -22,6 +23,14 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
+      - name: Cache Stryker incremental
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/reports/stryker-incremental.json
+            backend/.stryker-tmp
+          key: stryker-${{ runner.os }}-${{ hashFiles('backend/src/**/*.ts', 'backend/tests/**/*.ts', 'backend/stryker.conf.json', 'backend/jest.config.cjs', 'backend/package-lock.json') }}
+
       - name: Install dependencies
         working-directory: backend
         run: npm ci
@@ -29,6 +38,12 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: npm test
+
+      - name: Run mutation tests (min. 70% score)
+        working-directory: backend
+        env:
+          NODE_ENV: test
+        run: npm run test:mutation:ci
 
   web-tests:
     name: Web tests
