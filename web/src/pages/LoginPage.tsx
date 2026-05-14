@@ -107,7 +107,7 @@ export function LoginPage() {
             <button
               type="button"
               className="login-password-toggle"
-              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              aria-label={showPassword ? "Ocultar texto digitado" : "Exibir texto digitado"}
               aria-pressed={showPassword}
               onClick={() => setShowPassword((s) => !s)}
             >

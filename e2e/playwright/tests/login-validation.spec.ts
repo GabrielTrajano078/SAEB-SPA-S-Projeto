@@ -6,8 +6,8 @@ test.describe("Login — validação", () => {
   });
 
   test("e-mail inválido exibe mensagem do schema (alerta inline)", async ({ page }) => {
-    await page.getByLabel("E-mail").fill("nao-e-um-email");
-    await page.getByLabel("Senha").fill("qualquer");
+    await page.getByRole("textbox", { name: /E-mail/ }).fill("nao-e-um-email");
+    await page.getByRole("textbox", { name: /Senha/ }).fill("qualquer");
     await page.getByRole("button", { name: "Entrar" }).click();
     const alert = page.getByRole("alert");
     await expect(alert).toBeVisible();
@@ -15,8 +15,8 @@ test.describe("Login — validação", () => {
   });
 
   test("senha vazia exibe mensagem do schema (alerta inline)", async ({ page }) => {
-    await page.getByLabel("E-mail").fill("usuario@exemplo.com");
-    await page.getByLabel("Senha").fill("");
+    await page.getByRole("textbox", { name: /E-mail/ }).fill("usuario@exemplo.com");
+    await page.getByRole("textbox", { name: /Senha/ }).fill("");
     await page.getByRole("button", { name: "Entrar" }).click();
     const alert = page.getByRole("alert");
     await expect(alert).toBeVisible();
@@ -36,8 +36,8 @@ test.describe("Login — validação", () => {
       });
     });
 
-    await page.getByLabel("E-mail").fill("usuario@exemplo.com");
-    await page.getByLabel("Senha").fill("SenhaErrada123");
+    await page.getByRole("textbox", { name: /E-mail/ }).fill("usuario@exemplo.com");
+    await page.getByRole("textbox", { name: /Senha/ }).fill("SenhaErrada123");
     await page.getByRole("button", { name: "Entrar" }).click();
     const alert = page.getByRole("alert");
     await expect(alert).toBeVisible();
