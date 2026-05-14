@@ -1,6 +1,6 @@
 const objectId = {
   type: "string",
-  pattern: "^[a-f\\d]{24}$",
+  pattern: String.raw`^[a-f\d]{24}$`,
   example: "69c6f8703a3ba38a6a0cfe7c",
 };
 
@@ -348,6 +348,7 @@ export const openApiDocument = {
               },
             },
           },
+          400: errorResponse,
           401: errorResponse,
         },
       },

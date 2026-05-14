@@ -3,9 +3,9 @@ import { expect, test } from "@playwright/test";
 test.describe("Smoke UI", () => {
   test("página de login exibe título e formulário", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
-    await expect(page.getByLabel("E-mail")).toBeVisible();
-    await expect(page.getByLabel("Senha")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Educahub" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /E-mail/ })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /Senha/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
   });
 
