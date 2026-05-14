@@ -162,3 +162,24 @@ jobs:
       - name: Encerrar stack E2E (compose)
         if: always()
         run: python3 e2e/run_e2e.py down || true
+
+  # Check único para Branch protection: exija "CI merge gate" em Settings → Rules.
+  # Evita merge com E2E (ou outro job) falhando quando só parte dos checks estava obrigatória.
+  merge-gate:
+    name: CI merge gate
+    runs-on: ubuntu-latest
+    needs: [backend-tests, web-tests, e2e]
+    if: always()
+    steps:
+      - name: Falhar se qualquer teste falhou ou foi cancelado
+        env:
+          BACKEND: ${{ needs.backend-tests.result }}
+          WEB: ${{ needs.web-tests.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          set -e
+          echo "backend-tests=$BACKEND web-tests=$WEB e2e=$E2E"
+          test "$BACKEND" = "success"
+          test "$WEB" = "success"
+          test "$E2E" = "success"
+          echo "Todos os checks passaram."
