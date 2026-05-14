@@ -26,7 +26,7 @@ describe("LoginPage", () => {
     mockAnonymousAuth(vi.fn() as AuthContextValue["login"]);
     const { container } = renderPage(<LoginPage />);
 
-    const form = container.querySelector("form.auth-form");
+    const form = container.querySelector("form.login-form");
     expect(form).toBeTruthy();
     expect((form as HTMLFormElement).noValidate).toBe(true);
 

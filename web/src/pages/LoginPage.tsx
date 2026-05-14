@@ -1,9 +1,11 @@
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useAuth } from "@/auth/useAuth";
 import { ApiError } from "@/lib/api-client";
 import { loginFormSchema, type LoginFormValues } from "@/schemas/auth";
+
+const REMEMBER_KEY = "saeb_spas_remember_me";
 
 export function LoginPage() {
   const { state, login } = useAuth();
@@ -11,12 +13,18 @@ export function LoginPage() {
   const [values, setValues] = useState<LoginFormValues>({ email: "", password: "" });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem(REMEMBER_KEY) === "1");
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(REMEMBER_KEY, rememberMe ? "1" : "0");
+  }, [rememberMe]);
 
   if (state.status === "loading") {
     return (
-      <main className="auth-layout">
+      <main className="auth-layout auth-layout--modern">
         <div className="app-canvas" aria-hidden="true" />
-        <output className="auth-card auth-card--loading muted" aria-live="polite">
+        <output className="auth-card auth-card--modern auth-card--loading login-loading" aria-live="polite">
           Carregando sessão…
         </output>
       </main>
@@ -50,52 +58,137 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-layout">
+    <main className="auth-layout auth-layout--modern">
       <div className="app-canvas" aria-hidden="true" />
-      <section className="auth-card">
-        <header className="auth-card-header">
-          <div className="auth-logo auth-logo--brand">
-            <BrandLogo variant="auth" />
+      <section className="auth-card auth-card--modern">
+        <header className="login-header-brand">
+          <div className="login-logo-wrap">
+            <div className="auth-logo auth-logo--brand">
+              <BrandLogo variant="auth" />
+            </div>
           </div>
-          <div className="auth-card-titles">
-            <h1>Entrar</h1>
-            <p className="auth-subtitle">Painel de diagnóstico · matriz SAEB</p>
-          </div>
+          <h1 className="login-screen-title">Educahub</h1>
+          <p className="login-tagline">Painel de diagnóstico · matriz SAEB</p>
         </header>
-        <form onSubmit={handleSubmit} className="stack auth-form" noValidate>
-          <label className="field">
-            <span className="field-label">E-mail</span>
+
+        <form onSubmit={handleSubmit} className="login-form" noValidate>
+          <div
+            className={`login-field-float${values.email.trim() ? " login-field-float--filled" : ""}`}
+          >
             <input
+              id="login-email"
+              className="login-field-float-input"
               type="email"
               autoComplete="username"
+              placeholder=" "
               value={values.email}
               onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
-              placeholder="seu@email.com"
             />
-          </label>
-          <label className="field">
-            <span className="field-label">Senha</span>
+            <label className="login-field-float-label" htmlFor="login-email">
+              E-mail
+            </label>
+          </div>
+
+          <div
+            className={`login-field-float${values.password.length > 0 ? " login-field-float--filled" : ""}`}
+          >
             <input
-              type="password"
+              id="login-password"
+              className="login-field-float-input login-field-float-input--toggle"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
+              placeholder=" "
               value={values.password}
               onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-              placeholder="••••••••"
             />
+            <label className="login-field-float-label" htmlFor="login-password">
+              Senha
+            </label>
+            <button
+              type="button"
+              className="login-password-toggle"
+              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((s) => !s)}
+            >
+              {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
+            </button>
+          </div>
+
+          <label className="login-remember">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span>Lembrar de mim</span>
           </label>
+
           {error ? (
-            <p className="error auth-error" role="alert">
+            <p className="error auth-error login-inline-error" role="alert">
               {error}
             </p>
           ) : null}
-          <button type="submit" className="primary auth-submit" disabled={submitting}>
+
+          <button type="submit" className="login-submit" disabled={submitting}>
             {submitting ? "Entrando…" : "Entrar"}
           </button>
         </form>
-        <p className="auth-footer-link">
-          <Link to="/bootstrap">Primeiro acesso — criar administrador</Link>
-        </p>
+
+        <div className="login-footer-links">
+          <span className="login-link-accent login-link-accent--disabled" title="Recuperação de senha em breve">
+            Esqueceu a senha?
+          </span>
+          <span className="login-footer-dot" aria-hidden="true">
+            ·
+          </span>
+          <Link className="login-link-secondary" to="/bootstrap">
+            Primeiro acesso — criar administrador
+          </Link>
+        </div>
       </section>
     </main>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      className="login-password-toggle-icon"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeSlashIcon() {
+  return (
+    <svg
+      className="login-password-toggle-icon"
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
   );
 }
