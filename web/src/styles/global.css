@@ -2187,7 +2187,8 @@ a.ghost {
 /* Tema claro moderno (login + app autenticado)                               */
 /* -------------------------------------------------------------------------- */
 
-.ui-theme-modern {
+.ui-theme-modern,
+body[data-theme="modern"] {
   color-scheme: light;
   --ui-text: #0f172a;
   --ui-muted: #64748b;
@@ -2401,10 +2402,29 @@ body[data-theme="modern"] .confirm-dialog-backdrop {
 }
 
 body[data-theme="modern"] .confirm-dialog {
-  border-color: var(--ui-border);
-  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  background: #ffffff;
   color: var(--ui-text);
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 1px 0 rgba(15, 23, 42, 0.04) inset,
+    0 24px 48px rgba(15, 23, 42, 0.12);
+}
+
+body[data-theme="modern"] .confirm-dialog__title {
+  color: var(--ui-text);
+}
+
+body[data-theme="modern"] .confirm-dialog__desc {
+  color: var(--ui-muted);
+}
+
+body[data-theme="modern"] .confirm-dialog .ghost {
+  color: var(--ui-muted);
+}
+
+body[data-theme="modern"] .confirm-dialog .ghost:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: #f1f5f9;
 }
 
 /* Login moderno (campos com rótulo flutuante) */
