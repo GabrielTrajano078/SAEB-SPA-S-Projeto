@@ -8,8 +8,8 @@ import { SchoolsPage } from "./SchoolsPage";
 
 const navigate = vi.fn();
 
-vi.mock("react-router-dom", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react-router-dom")>();
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
     useNavigate: () => navigate,
@@ -59,8 +59,7 @@ describe("SchoolsPage", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("lista escolas e navega para resumo ao ver detalhes", async () => {
-    navigate.mockReset();
+  it("lista escolas e abre resumo ao clicar em Ver", async () => {
     mockedUseAuth.mockReturnValue(adminAuth);
     mockedListSchools.mockResolvedValueOnce([
       {
@@ -70,6 +69,7 @@ describe("SchoolsPage", () => {
         municipalityCode: "2304400",
       },
     ]);
+    navigate.mockReset();
 
     renderPage(<SchoolsPage />);
 
