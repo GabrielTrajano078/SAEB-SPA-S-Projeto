@@ -22,6 +22,7 @@ vi.mock("@/auth/useAuth", () => ({
 
 vi.mock("@/api/schools", () => ({
   listSchools: vi.fn(),
+  deleteSchool: vi.fn(),
 }));
 
 const mockedUseAuth = vi.mocked(useAuth);
